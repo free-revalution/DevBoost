@@ -24,10 +24,20 @@ export class CommandHandler {
     'history',
     'clear',
     'provider',
+    'model',
     'devboost'
   ];
 
   private agentStarted: boolean = false;
+  private modelAddInProgress: boolean = false;
+  private pendingModelData: {
+    provider?: string;
+    modelName?: string;
+    apiKey?: string;
+    maxTokens?: number;
+    temperature?: number;
+    baseUrl?: string;
+  } = {};
 
   constructor(
     private configManager: ConfigManager,
@@ -66,6 +76,11 @@ export class CommandHandler {
           return this.handleClearCommand();
         case 'provider':
           return this.handleProviderCommand(command);
+        case 'model':
+          if (!command.action) {
+            return await this.handleModelCommand('list', []);
+          }
+          return await this.handleModelCommand(command.action, command.args);
         case 'devboost':
           return this.handleDevBoostCommand(command);
         default:
@@ -81,6 +96,13 @@ export class CommandHandler {
     return `Available commands:
 
   {bold}/help{/bold}                          Show this help message
+
+  {bold}/model{/bold} <command> [args]         Model management (NEW!)
+    add                                Add a new model (interactive)
+    list                               List all configured models
+    switch <id>                         Switch to a model
+    remove <id>                         Remove a model
+    cancel                             Cancel model addition
 
   {bold}/agent{/bold} <start|stop|status>      Agent management
     start                               Start the agent
@@ -100,7 +122,7 @@ export class CommandHandler {
 
   {bold}/clear{/bold}                          Clear the screen
 
-  {bold}/provider{/bold} <command> [args]      Manage LLM providers
+  {bold}/provider{/bold} <command> [args]      Manage LLM providers (legacy)
     add <type>                          Add a provider
     use <type>                          Switch to a provider
     list                                List all providers
@@ -274,6 +296,281 @@ Initialized: ${this.configManager.exists() ? 'Yes' : 'No'}`;
       default:
         return `Unknown devboost action: ${command.action}`;
     }
+  }
+
+  /**
+   * Handle model management commands
+   */
+  async handleModelCommand(action: string, args: string[]): Promise<string> {
+    switch (action) {
+      case 'add':
+        return await this.handleModelAdd();
+      case 'list':
+        return await this.handleModelList();
+      case 'switch':
+        if (args.length === 0) {
+          return 'Usage: /model switch <model-id>\n\nUse /model list to see available models.';
+        }
+        return await this.handleModelSwitch(args[0]);
+      case 'remove':
+        if (args.length === 0) {
+          return 'Usage: /model remove <model-id>\n\nUse /model list to see available models.';
+        }
+        return await this.handleModelRemove(args[0]);
+      case 'cancel':
+        if (this.modelAddInProgress) {
+          this.modelAddInProgress = false;
+          this.pendingModelData = {};
+          return 'Model addition cancelled.';
+        }
+        return 'No model addition in progress.';
+      default:
+        return `Unknown model action: ${action}
+
+Available actions:
+  add    - Add a new model (interactive)
+  list   - List all configured models
+  switch - Switch to a different model
+  remove - Remove a model
+  cancel - Cancel model addition`;
+    }
+  }
+
+  /**
+   * Handle model add (interactive)
+   */
+  async handleModelAdd(): Promise<string> {
+    if (this.modelAddInProgress) {
+      return 'Model addition already in progress. Use /model cancel to cancel or continue with: /model add';
+    }
+
+    this.modelAddInProgress = true;
+    this.pendingModelData = {};
+
+    return `Adding a new model...
+
+Please provide the following information (one at a time):
+
+1. Provider (anthropic, openai, openai-compatible, ollama)
+   Usage: /model provider <provider-name>
+
+Example: /model provider anthropic
+
+Type /model cancel to cancel at any time.`;
+  }
+
+  /**
+   * Handle model add provider step
+   */
+  async handleModelAddProvider(provider: string): Promise<string> {
+    if (!this.modelAddInProgress) {
+      return 'No model addition in progress. Use /model add to start.';
+    }
+
+    const validProviders = ['anthropic', 'openai', 'openai-compatible', 'ollama'];
+    if (!validProviders.includes(provider)) {
+      return `Invalid provider: ${provider}
+
+Valid providers: ${validProviders.join(', ')}
+
+Usage: /model provider <provider-name>`;
+    }
+
+    this.pendingModelData.provider = provider;
+
+    return `Provider set to: ${provider}
+
+2. Model Name
+   Usage: /model name <model-name>
+
+Examples:
+   Anthropic: claude-3-5-sonnet-20241022, claude-3-opus-20240229
+   OpenAI: gpt-4, gpt-3.5-turbo
+   Ollama: llama2, mistral
+
+Usage: /model name <model-name>`;
+  }
+
+  /**
+   * Handle model add name step
+   */
+  async handleModelAddName(modelName: string): Promise<string> {
+    if (!this.modelAddInProgress) {
+      return 'No model addition in progress. Use /model add to start.';
+    }
+
+    if (!this.pendingModelData.provider) {
+      return 'Please set provider first: /model provider <provider>';
+    }
+
+    if (!modelName || modelName.trim() === '') {
+      return 'Model name cannot be empty.';
+    }
+
+    this.pendingModelData.modelName = modelName.trim();
+
+    return `Model name set to: ${modelName}
+
+3. API Key
+   Usage: /model key <your-api-key>
+
+Note: Your API key will be stored securely in .devboost/models.json
+
+Usage: /model key <your-api-key>`;
+  }
+
+  /**
+   * Handle model add API key step
+   */
+  async handleModelAddKey(apiKey: string): Promise<string> {
+    if (!this.modelAddInProgress) {
+      return 'No model addition in progress. Use /model add to start.';
+    }
+
+    if (!this.pendingModelData.modelName) {
+      return 'Please set model name first: /model name <model-name>';
+    }
+
+    if (!apiKey || apiKey.trim() === '') {
+      return 'API key cannot be empty.';
+    }
+
+    this.pendingModelData.apiKey = apiKey.trim();
+
+    // Set default values
+    this.pendingModelData.maxTokens = this.pendingModelData.maxTokens || 4096;
+    this.pendingModelData.temperature = this.pendingModelData.temperature || 0.7;
+
+    // Add the model
+    try {
+      const model = await this.configManager.addModel({
+        provider: this.pendingModelData.provider!,
+        modelName: this.pendingModelData.modelName!,
+        apiKey: this.pendingModelData.apiKey,
+        maxTokens: this.pendingModelData.maxTokens,
+        temperature: this.pendingModelData.temperature,
+        baseUrl: this.pendingModelData.baseUrl
+      });
+
+      // Reset state
+      this.modelAddInProgress = false;
+      this.pendingModelData = {};
+
+      return `✓ Model added successfully!
+
+Model ID: ${model.id}
+Provider: ${model.provider}
+Model: ${model.modelName}
+
+The model has been saved and is ready to use.
+You can switch to it anytime with: /model switch ${model.id}`;
+    } catch (error) {
+      this.modelAddInProgress = false;
+      this.pendingModelData = {};
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return `✗ Failed to add model: ${errorMessage}`;
+    }
+  }
+
+  /**
+   * Handle model list
+   */
+  async handleModelList(): Promise<string> {
+    const models = await this.configManager.getAllModels();
+    const currentModel = await this.configManager.getCurrentModel();
+
+    if (models.length === 0) {
+      return `No models configured yet.
+
+Add your first model with: /model add`;
+    }
+
+    let output = `Configured Models (${models.length}):
+`;
+
+    for (const model of models) {
+      const isCurrent = currentModel?.id === model.id;
+      const currentMarker = isCurrent ? ' *' : '';
+      const maskedKey = model.apiKey ? `***${model.apiKey.slice(-4)}` : '(no key)';
+
+      output += `
+${currentMarker}[${model.id}]
+  Provider: ${model.provider}
+  Model: ${model.modelName}
+  API Key: ${maskedKey}
+  Max Tokens: ${model.maxTokens}
+  Temperature: ${model.temperature}
+`;
+    }
+
+    output += `
+* = Current model
+
+Switch models: /model switch <model-id>
+Remove model: /model remove <model-id>`;
+
+    return output;
+  }
+
+  /**
+   * Handle model switch
+   */
+  async handleModelSwitch(modelId: string): Promise<string> {
+    const success = await this.configManager.switchModel(modelId);
+
+    if (!success) {
+      return `✗ Model not found: ${modelId}
+
+Use /model list to see available models.`;
+    }
+
+    const model = await this.configManager.getModel(modelId);
+
+    return `✓ Switched to model: ${modelId}
+Provider: ${model?.provider}
+Model: ${model?.modelName}`;
+  }
+
+  /**
+   * Handle model remove
+   */
+  async handleModelRemove(modelId: string): Promise<string> {
+    const model = await this.configManager.getModel(modelId);
+
+    if (!model) {
+      return `✗ Model not found: ${modelId}
+
+Use /model list to see available models.`;
+    }
+
+    const success = await this.configManager.removeModel(modelId);
+
+    if (!success) {
+      return `✗ Failed to remove model: ${modelId}`;
+    }
+
+    return `✓ Removed model: ${modelId} (${model.provider}/${model.modelName})`;
+  }
+
+  /**
+   * Check if model addition is in progress
+   */
+  isModelAddInProgress(): boolean {
+    return this.modelAddInProgress;
+  }
+
+  /**
+   * Get pending model data
+   */
+  getPendingModelData(): typeof this.pendingModelData {
+    return { ...this.pendingModelData };
+  }
+
+  /**
+   * Set pending model data field
+   */
+  setPendingModelData(field: string, value: any): void {
+    (this.pendingModelData as any)[field] = value;
   }
 
   isAgentStarted(): boolean {

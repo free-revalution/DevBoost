@@ -261,4 +261,38 @@ export class DevBoostCLI {
   getVersion(): string {
     return this.version;
   }
+
+  /**
+   * Initialize components for simple mode (no TUI)
+   */
+  initializeForSimpleMode(): void {
+    if (this.commandHandler) {
+      return; // Already initialized
+    }
+
+    if (!this.agent) {
+      throw new Error('Agent not initialized. Call initialize() first.');
+    }
+
+    // Create a minimal TUI manager for command handling (no actual TUI)
+    const minimalTUIManager = {
+      displayMessage: () => {},
+      showStatus: () => {},
+      clearConversation: () => {},
+      getConversationHistory: () => [],
+      render: () => {},
+      isInitialized: () => false,
+      destroy: () => {},
+      setInputHandler: () => {},
+      handleAgentResponse: async () => {},
+      getLayout: () => null
+    };
+
+    // Create command handler
+    this.commandHandler = new CommandHandler(
+      this.configManager,
+      this.agent,
+      minimalTUIManager as any
+    );
+  }
 }
