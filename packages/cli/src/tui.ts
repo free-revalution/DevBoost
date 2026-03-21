@@ -239,8 +239,6 @@ export class TUIManager {
    * Display tool execution status
    */
   displayToolExecution(toolName: string, status: 'starting' | 'success' | 'error', result?: any): void {
-    if (!this.conversationBox) return;
-
     let message = '';
 
     switch (status) {

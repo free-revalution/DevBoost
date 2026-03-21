@@ -113,7 +113,7 @@ describe('TUIManager', () => {
       expect(history.length).toBeGreaterThan(0);
       expect(history[history.length - 1].role).toBe('tool');
       expect(history[history.length - 1].content).toContain('build');
-      expect(history[history.length - 1].content).toContain('starting');
+      expect(history[history.length - 1].content).toContain('Starting tool execution');
     });
 
     it('should display tool execution success', () => {
@@ -131,7 +131,7 @@ describe('TUIManager', () => {
       const history = tuiManager.getConversationHistory();
       const lastMessage = history[history.length - 1];
       expect(lastMessage.role).toBe('tool');
-      expect(lastMessage.content).toContain('error');
+      expect(lastMessage.content).toContain('failed');
       expect(lastMessage.content).toContain('Build failed');
     });
   });

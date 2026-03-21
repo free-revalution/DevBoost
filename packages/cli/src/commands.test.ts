@@ -97,6 +97,8 @@ describe('CommandHandler', () => {
     });
 
     it('should execute agent stop command', async () => {
+      // Set agent as started first
+      handler['agentStarted'] = true;
       const result = await handler.execute({ command: 'agent', action: 'stop', args: [] });
       expect(result).toContain('Agent');
       expect(result).toContain('stopped');
@@ -173,6 +175,8 @@ describe('CommandHandler', () => {
     });
 
     it('should handle agent stop', async () => {
+      // Set agent as started first
+      handler['agentStarted'] = true;
       const result = await handler.handleAgentCommand('stop', []);
       expect(result).toContain('stopped');
       expect(mockAgent.shutdown).toHaveBeenCalled();

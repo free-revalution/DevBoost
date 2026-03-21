@@ -194,7 +194,8 @@ describe('MainLoop', () => {
 
       await mainLoop.handleInput('Hello');
 
-      expect(mockTUIManager.displayMessage).toHaveBeenCalledWith('system', expect.stringContaining('Agent not started'));
+      // Should show error status (not displayMessage) when agent is not started
+      expect(mockTUIManager.showStatus).toHaveBeenCalledWith('error', expect.stringContaining('Agent is not started'));
       expect(mockAgent.process).not.toHaveBeenCalled();
     });
 
@@ -265,7 +266,8 @@ describe('MainLoop', () => {
       mockCommandHandler.parse = vi.fn(() => parsedCommand);
       mockCommandHandler.execute = vi.fn().mockResolvedValue('Help displayed');
 
-      await mainLoop.handleCommand('/help');
+      // handleCommand is private but needs both input and parsedCommand
+      await (mainLoop as any).handleCommand('/help', parsedCommand);
 
       expect(mockCommandHandler.execute).toHaveBeenCalledWith(parsedCommand);
       expect(mockTUIManager.displayMessage).toHaveBeenCalledWith('system', 'Help displayed');
