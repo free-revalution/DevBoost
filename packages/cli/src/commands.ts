@@ -133,7 +133,7 @@ export class CommandHandler {
       case 'status':
         const status = this.agentStarted ? 'Running' : 'Stopped';
         const context = this.agent.getContext();
-        const messageCount = context.getMessageCount();
+        const messageCount = context.getMessages().length;
         return `Agent Status: ${status}
 Messages in context: ${messageCount}
 Tools available: ${this.agent.getToolRegistry().list().length}`;
@@ -172,10 +172,9 @@ Tools available: ${this.agent.getToolRegistry().list().length}`;
 
       case 'info':
         const ctx = this.agent.getContext();
-        const msgCount = ctx.getMessageCount();
+        const msgCount = ctx.getMessages().length;
         return `Context Information:
 Total messages: ${msgCount}
-Context size: ${ctx.getSize?.() || 'Unknown'}
 Last updated: ${new Date().toISOString()}`;
 
       default:

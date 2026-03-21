@@ -185,7 +185,7 @@ export class DevBoostCLI {
       }
 
       // Shutdown agent
-      if (this.commandHandler?.isAgentStarted()) {
+      if (this.agent && this.commandHandler?.isAgentStarted()) {
         await this.agent.shutdown();
       }
 

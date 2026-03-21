@@ -125,7 +125,7 @@ export class TUIManager {
         fg: CatppuccinMocha.fg,
         bg: CatppuccinMocha.bg,
         border: { fg: CatppuccinMocha.border },
-        label: { fg: CatppuccinMocha.green },
+        label: CatppuccinMocha.green as string,
         selected: { bg: CatppuccinMocha.bgLight, fg: CatppuccinMocha.cyan }
       },
       items: []
@@ -276,7 +276,7 @@ export class TUIManager {
       for (const task of tasks) {
         const statusIcon = this.getTaskStatusIcon(task.status);
         const item = `${statusIcon} ${task.content}`;
-        this.taskList.pushItem(item);
+        (this.taskList as any).pushItem(item);
       }
 
       this.render();

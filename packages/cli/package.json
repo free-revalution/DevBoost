@@ -18,7 +18,10 @@
   "scripts": {
     "build": "tsc",
     "test": "vitest",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "start": "node dist/cli-entry.js",
+    "start:simple": "node dist/cli-entry.js --no-tui",
+    "dev": "tsc && node dist/cli-entry.js --no-tui"
   },
   "dependencies": {
     "@devboost/core": "workspace:*",
