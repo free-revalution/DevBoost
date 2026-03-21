@@ -2,6 +2,7 @@
  * Browser automation for PCB platforms
  */
 
+// Core interfaces and classes
 export interface BrowserConfig {
   headless?: boolean;
   timeout?: number;
@@ -29,3 +30,9 @@ export class BrowserAgent {
     // TODO: Close browser
   }
 }
+
+// JLCPCB exports
+export * from './jlcpcb/types';
+export * from './jlcpcb/manager';
+export * from './jlcpcb/pages';
+export * from './jlcpcb/automator';
