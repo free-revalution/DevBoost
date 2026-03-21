@@ -18,7 +18,9 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@nut-tree/nut-js": "^4.2.0"
+    "@nut-tree/nut-js": "^4.2.0",
+    "execa": "^9.6.1",
+    "fast-xml-parser": "^5.5.8"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
