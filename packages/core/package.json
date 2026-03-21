@@ -18,10 +18,12 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@devboost/automation": "workspace:*",
     "@devboost/llm": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "@vitest/coverage-v8": "^2.1.9",
     "typescript": "^5.7.0",
     "vitest": "^2.1.0"
   }
