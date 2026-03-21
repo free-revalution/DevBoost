@@ -63,16 +63,21 @@ export OLLAMA_API_KEY="your-api-key-here"
 ### 运行 / Run
 
 ```bash
-# 方式1: 直接运行 / Direct run
+# 方式1: 简单模式 (推荐/Recommended) - 无需 TUI
+pnpm start:simple
+# 或
+node packages/cli/dist/cli-entry.js --no-tui
+
+# 方式2: TUI 模式 (完整界面)
+pnpm start
+# 或
 node packages/cli/dist/cli-entry.js
 
-# 方式2: 使用 pnpm (推荐/recommended)
-pnpm --filter @devboost/cli start
-
-# 方式3: 全局安装后使用 / Global install
-pnpm install -g .
-devboost
+# 方式3: 查看帮助
+node packages/cli/dist/cli-entry.js --help
 ```
+
+**注意 / Note:** 如果 TUI 模式在终端中出现乱码或错误，请使用简单模式 (`--no-tui`)。
 
 ## 使用指南 / Usage Guide
 

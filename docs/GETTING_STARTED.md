@@ -37,7 +37,15 @@ pnpm install
 pnpm build
 
 # 4. 运行 / Run
-node packages/cli/dist/cli-entry.js
+
+# 简单模式 (推荐/Recommended) - 无需 TUI
+pnpm start:simple
+
+# TUI 模式 (完整界面/Full TUI)
+pnpm start
+
+# 查看帮助 / Show help
+node packages/cli/dist/cli-entry.js --help
 ```
 
 ### 全局安装 / Global Install
@@ -116,7 +124,14 @@ devboost
 ### 启动 DevBoost
 
 ```bash
-devboost
+# 简单模式 (推荐/Recommended)
+pnpm start:simple
+
+# TUI 模式 / TUI mode
+pnpm start
+
+# 或直接运行 / Or direct run
+node packages/cli/dist/cli-entry.js --no-tui
 ```
 
 你会看到以下界面 / You will see:
