@@ -34,7 +34,9 @@ export class CommandHandler {
     'provider',
     'model',
     'telegram',
-    'devboost'
+    'devboost',
+    'quit',
+    'exit'
   ];
 
   private agentStarted: boolean = false;
@@ -98,8 +100,11 @@ export class CommandHandler {
           return await this.handleTelegramCommand(command.action, command.args);
         case 'devboost':
           return this.handleDevBoostCommand(command);
+        case 'quit':
+        case 'exit':
+          return this.handleQuitCommand();
         default:
-          return 'Unknown command';
+          return 'Unknown command. Type /help for available commands.';
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -112,20 +117,19 @@ export class CommandHandler {
 
   {bold}/help{/bold}                          Show this help message
 
-  {bold}/model{/bold} <command> [args]         Model management
-    add                                Add a new model (interactive)
-    list                               List all configured models
-    switch <id>                         Switch to a model
-    remove <id>                         Remove a model
-    cancel                             Cancel model addition
+  {bold}/model{/bold} [args]                    Model management
+    /model                             Show model list & menu
+    /model add <name> <url> <key>        Add a new model
+    /model switch <id>                  Switch to a model
+    /model remove <id>                  Remove a model
 
-  {bold}/agent{/bold} <start|stop|status>      Agent management
+  {bold}/agent{/bold} <action>                 Agent management
     start                               Start the agent
     stop                                Stop the agent
     status                              Show agent status
     restart                             Restart the agent
 
-  {bold}/context{/bold} <clear|save|load>      Context management
+  {bold}/context{/bold} <action>                Context management
     clear                               Clear conversation context
     save [name]                         Save current context
     load [name]                         Load saved context
@@ -137,17 +141,15 @@ export class CommandHandler {
 
   {bold}/clear{/bold}                          Clear the screen
 
-  {bold}/telegram{/bold} <command> [args]      Telegram Bot
+  {bold}/telegram{/bold} <action>               Telegram Bot
     init <token>                        Initialize with bot token
     start                               Start Telegram bot
     stop                                Stop Telegram bot
     status                              Show bot status
-    add-user <id> [name]                Add authorized user
-    remove-user <id>                    Remove authorized user
-    users                               List authorized users
 
-  {bold}/devboost{/bold} <command> [args]      DevBoost project management
-    init                                Initialize project
+  {bold}/quit{/bold} or {bold}/exit{/bold}                 Exit DevBoost
+
+  {bold}/devboost{/bold} <action>               Project info
     info                                Show project info`;
   }
 
@@ -321,66 +323,131 @@ Initialized: ${this.configManager.exists() ? 'Yes' : 'No'}`;
    * Handle model management commands
    */
   async handleModelCommand(action: string, args: string[]): Promise<string> {
+    // If no action specified, show model list and menu
+    if (!action) {
+      return await this.handleModelMenu();
+    }
+
     switch (action) {
       case 'add':
-        return await this.handleModelAdd();
+        // /model add <name> <url> <apiKey>
+        if (args.length >= 3) {
+          return await this.handleQuickAdd(args[0], args[1], args[2]);
+        }
+        return `Usage: /model add <name> <url> <apiKey>
+
+Example: /model add deepseek https://api.deepseek.com/v1 sk-xxxxx
+
+ name  - Model name (e.g., deepseek, gpt-4, etc.)
+ url   - API endpoint URL (e.g., https://api.deepseek.com/v1)
+ key   - Your API key`;
       case 'list':
         return await this.handleModelList();
       case 'switch':
         if (args.length === 0) {
-          return 'Usage: /model switch <model-id>\n\nUse /model list to see available models.';
+          return 'Usage: /model switch <model-id>\n\nUse /model to see available models.';
         }
         return await this.handleModelSwitch(args[0]);
       case 'remove':
         if (args.length === 0) {
-          return 'Usage: /model remove <model-id>\n\nUse /model list to see available models.';
+          return 'Usage: /model remove <model-id>\n\nUse /model to see available models.';
         }
         return await this.handleModelRemove(args[0]);
-      case 'cancel':
-        if (this.modelAddInProgress) {
-          this.modelAddInProgress = false;
-          this.pendingModelData = {};
-          return 'Model addition cancelled.';
-        }
-        return 'No model addition in progress.';
-      case 'provider':
-        if (args.length === 0) {
-          return 'Usage: /model provider <provider-name>\n\nValid providers: anthropic, openai, openai-compatible, ollama';
-        }
-        return await this.handleModelAddProvider(args[0]);
-      case 'name':
-        if (args.length === 0) {
-          return 'Usage: /model name <model-name>';
-        }
-        return await this.handleModelAddName(args.join(' '));
-      case 'key':
-        if (args.length === 0) {
-          return 'Usage: /model key <your-api-key>';
-        }
-        return await this.handleModelAddKey(args.join(' '));
-      case 'url':
-        return await this.handleModelAddBaseUrl(args.join(' '));
-      case 'confirm':
-        return await this.finalizeModelAdd();
       default:
-        return `Unknown model action: ${action}
+        return `Unknown action: ${action}
 
-Available actions:
-  add      - Add a new model (interactive)
-  list     - List all configured models
-  switch   - Switch to a different model
-  remove   - Remove a model
-  cancel   - Cancel model addition
-  provider - Set provider (during add)
-  name     - Set model name (during add)
-  key      - Set API key (during add)
-  url      - Set base URL (during add, optional)
-  confirm  - Confirm and add model (during add)`;
+Use /model to see available models and options.`;
     }
   }
 
   /**
-   * Handle model add (interactive)
+   * Show model menu with list and options
+   */
+  async handleModelMenu(): Promise<string> {
+    const models = await this.configManager.getAllModels();
+    const currentModel = await this.configManager.getCurrentModel();
+
+    if (models.length === 0) {
+      return `╔═══════════════════════════════════════════════════════════════╗
+║                      🤖 Model Management                        ║
+╠═══════════════════════════════════════════════════════════════╣
+║  No models configured yet.                                    ║
+║                                                                ║
+║  Add your first model:                                         ║
+║  /model add <name> <url> <apiKey>                             ║
+║                                                                ║
+║  Example:                                                      ║
+║  /model add deepseek https://api.deepseek.com/v1 sk-xxxxx      ║
+╚═══════════════════════════════════════════════════════════════╝`;
+    }
+
+    let output = `╔═══════════════════════════════════════════════════════════════╗
+║                      🤖 Model Management (${models.length})              ║
+╠═══════════════════════════════════════════════════════════════╣`;
+
+    for (let i = 0; i < models.length; i++) {
+      const model = models[i];
+      const isCurrent = currentModel?.id === model.id;
+      const currentMark = isCurrent ? ' → ' : '   ';
+      const num = (i + 1).toString().padStart(2, ' ');
+
+      const maskedKey = model.apiKey ? `***${model.apiKey.slice(-4)}` : '(no key)';
+      const name = model.modelName.length > 20 ? model.modelName.substring(0, 20) + '...' : model.modelName.padEnd(23);
+
+      output += `\n║ ${currentMark}[${num}] ${name} Key: ${maskedKey}`;
+
+      if (model.baseUrl) {
+        const url = model.baseUrl.length > 30 ? model.baseUrl.substring(0, 30) + '...' : model.baseUrl;
+        output += `\n║       URL: ${url.padEnd(47)}║`;
+      } else {
+        output += `\n║       ${' '.repeat(55)}║`;
+      }
+    }
+
+    output += `\n╠═══════════════════════════════════════════════════════════════╣
+║ Commands:                                                     ║
+║  /model add <name> <url> <key>   Add a new model               ║
+║  /model switch <id>               Switch to a model             ║
+║  /model remove <id>               Remove a model               ║
+║  /model list                     Show this menu                 ║
+╚═══════════════════════════════════════════════════════════════╝`;
+
+    return output;
+  }
+
+  /**
+   * Quick add model in one command
+   */
+  async handleQuickAdd(name: string, url: string, apiKey: string): Promise<string> {
+    try {
+      // Generate a simple ID from the name
+      const id = name.toLowerCase().replace(/[^a-z0-9]/g, '-');
+
+      const model = await this.configManager.addModel({
+        provider: 'custom', // All models are now "custom"
+        modelName: name,
+        apiKey: apiKey,
+        baseUrl: url,
+        maxTokens: 4096,
+        temperature: 0.7
+      });
+
+      return `✓ Model added successfully!
+
+Model ID: ${id}
+Name: ${name}
+URL: ${url}
+
+The model is now ready to use.
+Type /model to see all models.`;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return `✗ Failed to add model: ${errorMessage}`;
+    }
+  }
+
+  /**
+   * Handle model add (interactive) - DEPRECATED, kept for backward compatibility
    */
   async handleModelAdd(): Promise<string> {
     if (this.modelAddInProgress) {
@@ -775,5 +842,21 @@ Available actions:
   remove-user <id> - Remove authorized user
   users            - List all authorized users`;
     }
+  }
+
+  /**
+   * Handle quit/exit command
+   */
+  handleQuitCommand(): string {
+    // Set a flag or return special value to signal quit
+    // The CLI will check for this and exit
+    return 'QUIT';
+  }
+
+  /**
+   * Check if a response is a quit command
+   */
+  isQuitCommand(response: string): boolean {
+    return response === 'QUIT';
   }
 }

@@ -97,6 +97,14 @@ async function main() {
             return;
           }
 
+          // Check for quit command result
+          if (trimmed.toLowerCase() === 'quit' || trimmed.toLowerCase() === 'exit') {
+            console.log('Goodbye!');
+            rl.close();
+            process.exit(0);
+            return;
+          }
+
           if (trimmed === '') {
             prompt();
             return;
@@ -111,6 +119,14 @@ async function main() {
               } else {
                 const result = await handleCommand(trimmed, cli, commandHandler);
                 console.log(result);
+
+                // Check if this is a quit command
+                if (commandHandler.isQuitCommand(result)) {
+                  console.log('Goodbye!');
+                  rl.close();
+                  process.exit(0);
+                  return;
+                }
               }
             } else {
               // Regular message - show that agent needs to be started

@@ -142,6 +142,15 @@ export class MainLoop {
     try {
       const result = await this.commandHandler.execute(parsedCommand);
 
+      // Check if this is a quit command
+      if (this.commandHandler.isQuitCommand(result)) {
+        // Display goodbye and exit
+        this.tuiManager.showStatus('idle', 'Goodbye!');
+        await this.shutdown();
+        process.exit(0);
+        return;
+      }
+
       // Display command result as system message
       this.tuiManager.displayMessage('system', result);
     } catch (error) {
@@ -253,5 +262,33 @@ export class MainLoop {
    */
   getConfigManager(): ConfigManager {
     return this.configManager;
+  }
+
+  /**
+   * Shutdown the main loop gracefully
+   */
+  async shutdown(): Promise<void> {
+    if (!this.running) {
+      return;
+    }
+
+    // Shutdown agent if running
+    if (this.commandHandler.isAgentStarted()) {
+      try {
+        await this.agent.shutdown();
+        this.commandHandler.setAgentStarted(false);
+      } catch (error) {
+        console.error('Error shutting down agent:', error);
+      }
+    }
+
+    // Destroy TUI
+    try {
+      this.tuiManager.destroy();
+    } catch (error) {
+      console.error('Error destroying TUI:', error);
+    }
+
+    this.running = false;
   }
 }

@@ -59,8 +59,6 @@ export interface ValidationResult {
   errors: string[];
 }
 
-const VALID_PROVIDERS = ['anthropic', 'openai', 'openai-compatible', 'ollama'];
-
 export class ConfigManager {
   readonly projectPath: string;
   readonly configPath: string;
@@ -431,14 +429,19 @@ export class ConfigManager {
     // Validate models if provided
     if (config.models) {
       config.models.forEach((model, index) => {
-        if (!model.provider) {
-          errors.push(`Model ${index}: Missing provider`);
-        } else if (!VALID_PROVIDERS.includes(model.provider)) {
-          errors.push(`Model ${index}: Invalid provider: ${model.provider}`);
-        }
+        // Provider is optional - can be any value
+        // No provider validation needed
 
         if (!model.modelName) {
           errors.push(`Model ${index}: Missing modelName`);
+        }
+
+        if (!model.apiKey || model.apiKey.trim() === '') {
+          errors.push(`Model ${index}: Missing apiKey`);
+        }
+
+        if (!model.baseUrl || model.baseUrl.trim() === '') {
+          errors.push(`Model ${index}: Missing baseUrl (API endpoint URL)`);
         }
 
         if (model.maxTokens !== undefined && (typeof model.maxTokens !== 'number' || model.maxTokens <= 0)) {
@@ -463,18 +466,21 @@ export class ConfigManager {
   validateModel(model: Partial<ModelConfig>): ValidationResult {
     const errors: string[] = [];
 
-    if (!model.provider) {
-      errors.push('Missing provider');
-    } else if (!VALID_PROVIDERS.includes(model.provider)) {
-      errors.push(`Invalid provider: ${model.provider}. Must be one of: ${VALID_PROVIDERS.join(', ')}`);
-    }
+    // provider is optional - user can use any provider
+    // if (!model.provider) {
+    //   errors.push('Missing provider');
+    // }
 
-    if (!model.modelName) {
+    if (!model.modelName || model.modelName.trim() === '') {
       errors.push('Missing modelName');
     }
 
     if (!model.apiKey || model.apiKey.trim() === '') {
       errors.push('Missing apiKey');
+    }
+
+    if (!model.baseUrl || model.baseUrl.trim() === '') {
+      errors.push('Missing baseUrl - API endpoint URL is required');
     }
 
     if (model.maxTokens !== undefined && (typeof model.maxTokens !== 'number' || model.maxTokens <= 0)) {
@@ -519,9 +525,10 @@ export class ConfigManager {
    * Generate a unique model ID
    */
   private generateModelId(provider: string, modelName: string): string {
-    // Sanitize the model name to create a valid ID
+    // Use model name as ID (sanitized) for simplicity
+    // Provider is no longer restricted, so ID is based on model name
     const sanitizedName = modelName.toLowerCase().replace(/[^a-z0-9-]/g, '-');
-    return `${provider}-${sanitizedName}`;
+    return sanitizedName;
   }
 
   /**
