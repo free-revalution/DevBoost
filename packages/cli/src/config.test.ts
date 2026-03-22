@@ -182,11 +182,12 @@ describe('ConfigManager', () => {
         provider: 'anthropic',
         modelName: 'claude-3-5-sonnet-20241022',
         apiKey: 'sk-ant-test',
+        baseUrl: 'https://api.anthropic.com',
         maxTokens: 4096,
         temperature: 0.7
       });
 
-      expect(model.id).toBe('anthropic-claude-3-5-sonnet-20241022');
+      expect(model.id).toBe('claude-3-5-sonnet-20241022');
       expect(model.provider).toBe('anthropic');
       expect(model.isDefault).toBe(true);
 
@@ -258,6 +259,7 @@ describe('ConfigManager', () => {
         provider: 'anthropic',
         modelName: 'claude-3-5-sonnet-20241022',
         apiKey: 'sk-ant-test',
+        baseUrl: 'https://api.anthropic.com',
         maxTokens: 4096,
         temperature: 0.7
       });
@@ -266,15 +268,16 @@ describe('ConfigManager', () => {
         provider: 'openai',
         modelName: 'gpt-4',
         apiKey: 'sk-openai-test',
+        baseUrl: 'https://api.openai.com',
         maxTokens: 8192,
         temperature: 0.5
       });
 
-      const switched = await manager.switchModel('openai-gpt-4');
+      const switched = await manager.switchModel('gpt-4');
       expect(switched).toBe(true);
 
       const config = await manager.load();
-      expect(config.currentModelId).toBe('openai-gpt-4');
+      expect(config.currentModelId).toBe('gpt-4');
     });
 
     it('should return false for non-existent model', async () => {
@@ -408,13 +411,13 @@ describe('ConfigManager', () => {
       expect(result.errors).toContain('Missing version');
     });
 
-    it('should validate model provider', async () => {
+    it('should validate model baseUrl is required', async () => {
       const manager = new ConfigManager(testDir);
       const invalidConfig = {
         version: '0.1.0',
         models: [{
           id: 'test',
-          provider: 'invalid-provider',
+          provider: 'any-provider',
           modelName: 'model',
           apiKey: 'key',
           maxTokens: 1000,
@@ -425,7 +428,7 @@ describe('ConfigManager', () => {
 
       const result = manager.validateConfig(invalidConfig);
       expect(result.valid).toBe(false);
-      expect(result.errors.some(e => e.includes('Invalid provider'))).toBe(true);
+      expect(result.errors.some(e => e.includes('baseUrl'))).toBe(true);
     });
   });
 
@@ -436,6 +439,7 @@ describe('ConfigManager', () => {
         provider: 'anthropic',
         modelName: 'claude-3-5-sonnet-20241022',
         apiKey: 'sk-ant-test',
+        baseUrl: 'https://api.anthropic.com',
         maxTokens: 4096,
         temperature: 0.7
       };
@@ -445,7 +449,7 @@ describe('ConfigManager', () => {
       expect(result.errors).toEqual([]);
     });
 
-    it('should detect missing provider', () => {
+    it('should detect missing baseUrl', () => {
       const manager = new ConfigManager(testDir);
       const model = {
         modelName: 'test',
@@ -456,7 +460,7 @@ describe('ConfigManager', () => {
 
       const result = manager.validateModel(model);
       expect(result.valid).toBe(false);
-      expect(result.errors).toContain('Missing provider');
+      expect(result.errors.some(e => e.includes('baseUrl'))).toBe(true);
     });
 
     it('should detect missing API key', () => {
@@ -464,6 +468,7 @@ describe('ConfigManager', () => {
       const model = {
         provider: 'anthropic',
         modelName: 'test',
+        baseUrl: 'https://api.anthropic.com',
         maxTokens: 1000,
         temperature: 0.5
       } as any;

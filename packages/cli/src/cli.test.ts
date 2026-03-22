@@ -16,7 +16,8 @@ vi.mock('@devboost/tui', () => ({
       key: vi.fn()
     },
     render: vi.fn(),
-    registerKey: vi.fn()
+    registerKey: vi.fn(),
+    onQuit: vi.fn()
   })),
   MainLayout: vi.fn().mockImplementation(() => ({
     input: {

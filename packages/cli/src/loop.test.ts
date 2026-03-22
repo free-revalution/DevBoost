@@ -48,7 +48,8 @@ describe('MainLoop', () => {
       parse: vi.fn(),
       execute: vi.fn(),
       isAgentStarted: vi.fn(() => false),
-      setAgentStarted: vi.fn()
+      setAgentStarted: vi.fn(),
+      isQuitCommand: vi.fn(() => false)
     } as unknown as CommandHandler;
 
     mockConfigManager = {
