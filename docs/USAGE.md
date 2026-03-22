@@ -53,42 +53,51 @@ node packages/cli/dist/cli-entry.js --no-tui
 ### 查看已配置的模型
 
 ```
-/model list
+/model
 ```
 
 输出示例：
 ```
-Configured Models (1):
+┌─────────────────────────────────────────┐
+│         Configured Models (2)           │
+├─────────────────────────────────────────┤
+│                                         │
+│ * claude-3-5-sonnet                     │
+│   URL: https://api.anthropic.com        │
+│   Max Tokens: 4096                      │
+│   Temperature: 0.7                      │
+│                                         │
+│   gpt-4                                 │
+│   URL: https://api.openai.com           │
+│   Max Tokens: 8192                      │
+│   Temperature: 0.5                      │
+│                                         │
+│ * = Current model                       │
+└─────────────────────────────────────────┘
 
- *[anthropic-default]
-  Provider: anthropic
-  Model: claude-3-5-sonnet-20241022
-  API Key: (no key)
-  Max Tokens: 4096
-  Temperature: 0.7
-
-* = Current model
+Commands:
+  /model add <name> <url> <key>    Add a new model
+  /model switch <id>               Switch to a model
+  /model remove <id>               Delete a model
 ```
 
-### 添加新模型（交互式）
+### 添加新模型（单命令）
 
 ```
-/model add
+/model add <model-name> <api-url> <api-key>
 ```
 
-然后按照提示逐步输入：
-
+示例：
 ```
-/model provider anthropic
-/model name claude-3-5-sonnet-20241022
-/model key sk-ant-your-key-here
+/model add claude-3-5-sonnet https://api.anthropic.com sk-ant-your-key
+/model add gpt-4 https://api.openai.com sk-your-openai-key
+/model add deepseek https://api.deepseek.com sk-your-deepseek-key
 ```
 
-支持的服务商：
-- `anthropic` - Anthropic Claude
-- `openai` - OpenAI GPT
-- `openai-compatible` - OpenAI 兼容 API
-- `ollama` - Ollama 本地模型
+**支持的任何 LLM 提供商**，只要提供：
+- 模型名称（任意名称）
+- API 端点 URL
+- API 密钥
 
 ### 切换模型
 
@@ -98,7 +107,7 @@ Configured Models (1):
 
 例如：
 ```
-/model switch anthropic-default
+/model switch gpt-4
 ```
 
 ### 删除模型
@@ -107,12 +116,9 @@ Configured Models (1):
 /model remove <model-id>
 ```
 
-### 取消添加操作
-
-在添加模型过程中，可以随时取消：
-
+例如：
 ```
-/model cancel
+/model remove claude-3-5-sonnet
 ```
 
 ## Agent 管理
@@ -209,16 +215,13 @@ Configured Models (1):
 pnpm start -- --no-tui
 
 # 2. 查看当前模型
-> /model list
+> /model
 
-# 3. 添加新模型
-> /model add
-> /model provider openai
-> /model name gpt-4
-> /model key sk-your-openai-key
+# 3. 添加新模型（一条命令完成）
+> /model add claude-3-5-sonnet https://api.anthropic.com sk-ant-your-key
 
 # 4. 切换到新模型
-> /model switch openai-gpt-4
+> /model switch claude-3-5-sonnet
 
 # 5. 启动 agent
 > /agent start
@@ -232,23 +235,24 @@ pnpm start -- --no-tui
 
 ## 配置文件
 
-模型配置保存在 `~/.devboost/models.json`：
+模型配置保存在 `.devboost/models.json`：
 
 ```json
 {
   "models": [
     {
-      "id": "anthropic-default",
+      "id": "claude-3-5-sonnet",
       "provider": "anthropic",
-      "modelName": "claude-3-5-sonnet-20241022",
+      "modelName": "claude-3-5-sonnet",
       "apiKey": "sk-ant-xxx",
+      "baseUrl": "https://api.anthropic.com",
       "maxTokens": 4096,
       "temperature": 0.7,
       "createdAt": "2024-01-01T00:00:00.000Z",
       "isDefault": true
     }
   ],
-  "currentModel": "anthropic-default"
+  "currentModelId": "claude-3-5-sonnet"
 }
 ```
 
@@ -273,8 +277,8 @@ export OPENAI_API_KEY="sk-your-openai-key"
 ### 模型添加失败
 
 1. 确保输入的 API 密钥格式正确
-2. 检查网络连接
-3. 验证服务商和模型名称是否正确
+2. 确保 API URL 格式正确（以 https:// 开头）
+3. 检查网络连接
 
 ### 更多帮助
 
