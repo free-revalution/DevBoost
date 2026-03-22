@@ -39,5 +39,7 @@ export class MainLayout {
 
   render(): void {
     this.screen.render();
+    // Focus the input element so user can type
+    this.input.focus();
   }
 }

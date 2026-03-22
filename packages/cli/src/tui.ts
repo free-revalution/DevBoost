@@ -73,6 +73,9 @@ export class TUIManager {
     // Setup input handler
     this.setupInputHandler();
 
+    // Render the layout and focus input
+    this.layout.render();
+
     this.initialized = true;
   }
 
