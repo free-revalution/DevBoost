@@ -5,6 +5,8 @@
  */
 
 import { EventEmitter } from 'events';
+import { promises as fs } from 'fs';
+import { join } from 'path';
 
 export interface Message {
   role: 'user' | 'assistant' | 'system';
@@ -27,6 +29,8 @@ export interface Session {
 export interface SessionManagerOptions {
   maxSessions?: number;
   sessionTimeout?: number; // in milliseconds
+  persistPath?: string; // Path to store session data
+  autoSave?: boolean; // Automatically save after changes
 }
 
 export class SessionManager extends EventEmitter {
@@ -34,11 +38,15 @@ export class SessionManager extends EventEmitter {
   private userIdToSessionId: Map<number, string> = new Map();
   private maxSessions: number;
   private sessionTimeout: number;
+  private persistPath: string;
+  private autoSave: boolean;
 
   constructor(options: SessionManagerOptions = {}) {
     super();
     this.maxSessions = options.maxSessions ?? 100;
     this.sessionTimeout = options.sessionTimeout ?? 24 * 60 * 60 * 1000; // 24 hours
+    this.persistPath = options.persistPath ?? '.devboost/sessions';
+    this.autoSave = options.autoSave ?? true;
 
     // Clean up expired sessions every hour
     setInterval(() => this.cleanupExpiredSessions(), 60 * 60 * 1000);
@@ -85,12 +93,17 @@ export class SessionManager extends EventEmitter {
   /**
    * Add a message to a session
    */
-  addMessage(sessionId: string, message: Message): void {
+  async addMessage(sessionId: string, message: Message): Promise<void> {
     const session = this.sessions.get(sessionId);
     if (session) {
       session.messages.push(message);
       session.lastActivity = Date.now();
       this.emit('message:added', { sessionId, message });
+
+      // Auto-save if enabled
+      if (this.autoSave) {
+        await this.save();
+      }
     }
   }
 
@@ -238,5 +251,56 @@ export class SessionManager extends EventEmitter {
     }
 
     return count;
+  }
+
+  /**
+   * Save all sessions to disk
+   */
+  async save(): Promise<void> {
+    try {
+      // Ensure directory exists
+      await fs.mkdir(this.persistPath, { recursive: true });
+
+      const sessionsFile = join(this.persistPath, 'sessions.json');
+      const sessionsArray = Array.from(this.sessions.values());
+
+      await fs.writeFile(sessionsFile, JSON.stringify(sessionsArray, null, 2), 'utf-8');
+    } catch (error) {
+      console.error('Failed to save sessions:', error);
+    }
+  }
+
+  /**
+   * Load sessions from disk
+   */
+  async load(): Promise<void> {
+    try {
+      const sessionsFile = join(this.persistPath, 'sessions.json');
+      const data = await fs.readFile(sessionsFile, 'utf-8');
+      const sessionsArray = JSON.parse(data) as Session[];
+
+      // Restore sessions
+      for (const session of sessionsArray) {
+        this.sessions.set(session.id, session);
+        this.userIdToSessionId.set(session.userId, session.id);
+      }
+
+      console.log(`Loaded ${sessionsArray.length} sessions from disk`);
+    } catch (error) {
+      // File doesn't exist or is invalid - start fresh
+      console.log('No existing sessions found, starting fresh');
+    }
+  }
+
+  /**
+   * Clear all sessions
+   */
+  async clearAll(): Promise<void> {
+    this.sessions.clear();
+    this.userIdToSessionId.clear();
+
+    if (this.autoSave) {
+      await this.save();
+    }
   }
 }

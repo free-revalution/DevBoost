@@ -143,6 +143,13 @@ export class DevBoostCLI {
       this.configManager
     );
 
+    // Register quit handler with screen manager
+    this.screenManager.onQuit(async () => {
+      console.log('\nShutting down gracefully...');
+      await this.shutdown();
+      process.exit(0);
+    });
+
     // Setup signal handlers for graceful shutdown
     this.setupSignalHandlers();
   }
@@ -339,8 +346,13 @@ export class DevBoostCLI {
       // Create session manager
       this.sessionManager = new SessionManager({
         maxSessions: 100,
-        sessionTimeout: 24 * 60 * 60 * 1000 // 24 hours
+        sessionTimeout: 24 * 60 * 60 * 1000, // 24 hours
+        persistPath: '.devboost/sessions',
+        autoSave: true
       });
+
+      // Load existing sessions
+      await this.sessionManager.load();
 
       // Create Telegram bot
       this.telegramBot = new TelegramBot({

@@ -36,3 +36,8 @@ pnpm-debug.log*
 # DevBoost CLI config (contains sensitive API keys)
 .devboost/models.json
 .devboost/telegram.json
+
+# But keep conversation history and context
+!.devboost/context/
+!.devboost/sessions/
+!.devboost/history/

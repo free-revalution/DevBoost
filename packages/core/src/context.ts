@@ -12,6 +12,7 @@ export interface ContextOptions {
   maxHistorySize?: number;
   persistPath?: string;
   autoSave?: boolean;
+  contextDir?: string; // New: specific directory for context files
 }
 
 export interface ProjectState {
@@ -41,10 +42,12 @@ export class ContextManager {
   private dirty: boolean;
 
   constructor(options: ContextOptions = {}) {
+    const contextDir = options.contextDir ?? '.devboost/context';
     this.options = {
-      maxHistorySize: options.maxHistorySize ?? 100,
-      persistPath: options.persistPath ?? '.devboost',
-      autoSave: options.autoSave ?? true
+      maxHistorySize: options.maxHistorySize ?? 1000, // Increased for long-term storage
+      persistPath: options.persistPath ?? contextDir,
+      autoSave: options.autoSave ?? true,
+      contextDir
     };
 
     this.state = {
@@ -268,7 +271,8 @@ export class ContextManager {
       const serialized = {
         messages: this.state.messages,
         currentProject: this.state.currentProject,
-        variables: Object.fromEntries(this.state.variables)
+        variables: Object.fromEntries(this.state.variables),
+        savedAt: new Date().toISOString()
       };
 
       await fs.writeFile(contextFile, JSON.stringify(serialized, null, 2), 'utf-8');

@@ -178,20 +178,37 @@ pnpm run uninstall:global
 
 ## 配置文件 / Configuration File
 
-配置文件位置 / Config file location: `.devboost/config.json`
+配置文件位置 / Config file location: `.devboost/`
 
-```json
-{
-  "version": "0.1.0",
-  "llmProvider": "anthropic",
-  "llmModel": "claude-sonnet-4-20250514",
-  "maxTokens": 4096,
-  "temperature": 0.7,
-  "projectPath": "/path/to/your/project",
-  "createdAt": "2026-03-21T00:00:00.000Z",
-  "updatedAt": "2026-03-21T00:00:00.000Z"
-}
 ```
+.devboost/
+├── config.json       # 元数据配置
+├── models.json       # 模型配置（含 API Key）
+├── context/          # 对话记录目录
+│   └── context.json  # 对话历史
+└── sessions/         # Telegram 会话
+    └── sessions.json
+```
+
+## 添加模型 / Add Model
+
+启动后使用交互式命令添加模型 / Use interactive commands after starting:
+
+```
+/model add                          # 开始添加
+/model provider anthropic            # 选择提供商
+/model name claude-3-5-sonnet-20241022  # 模型名称
+/model key sk-ant-xxxxx              # API Key
+/model confirm                       # 确认添加
+```
+
+支持的提供商 / Supported providers:
+- **anthropic**: Claude 3.5 Sonnet, Claude 3 Opus
+- **openai**: GPT-4, GPT-3.5 Turbo
+- **openai-compatible**: OpenAI 兼容 API（需填写 Base URL）
+- **ollama**: 本地模型（如 llama2, mistral）
+
+详细说明请查看 / See [docs/MODEL_SETUP.md](docs/MODEL_SETUP.md)
 
 ## 支持的 LLM 提供商 / Supported LLM Providers
 
