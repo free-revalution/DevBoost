@@ -77,6 +77,29 @@ node packages/cli/dist/cli-entry.js
 node packages/cli/dist/cli-entry.js --help
 ```
 
+### 全局安装 / Global Installation
+
+想要在任何地方使用 `DevBoost` 命令 / To use `DevBoost` command from anywhere:
+
+```bash
+# 全局安装 / Install globally
+pnpm run install:global
+
+# 然后可以直接使用 / Then you can use directly:
+DevBoost                    # 启动 TUI 模式 / Start TUI mode
+DevBoost --no-tui            # 启动简单模式 / Start simple mode
+DevBoost --help             # 显示帮助 / Show help
+
+# 不区分大小写 / Case-insensitive:
+devboost                    # 也可以工作 / Also works
+DEVBOOST                    # 也可以工作 / Also works
+```
+
+卸载全局命令 / Uninstall global command:
+```bash
+pnpm run uninstall:global
+```
+
 **注意 / Note:** 如果 TUI 模式在终端中出现乱码或错误，请使用简单模式 (`--no-tui`)。
 
 ## 使用指南 / Usage Guide

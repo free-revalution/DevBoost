@@ -21,7 +21,8 @@
     "clean": "rm -rf dist",
     "start": "node dist/cli-entry.js",
     "start:simple": "node dist/cli-entry.js --no-tui",
-    "dev": "tsc && node dist/cli-entry.js --no-tui"
+    "dev": "tsc && node dist/cli-entry.js --no-tui",
+    "prepublishOnly": "pnpm run build"
   },
   "dependencies": {
     "@devboost/core": "workspace:*",

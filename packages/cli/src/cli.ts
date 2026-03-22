@@ -58,7 +58,7 @@ export class DevBoostCLI {
 
     try {
       // Load configuration
-      await this.configManager.load();
+      const config = await this.configManager.load();
 
       // Initialize project if needed
       if (!this.projectManager.isInitialized()) {
@@ -68,8 +68,21 @@ export class DevBoostCLI {
       // Create agent if not provided
       if (!this.agent) {
         const { Agent: AgentClass } = await import('@devboost/core');
+
+        // Get current model config
+        const currentModel = await this.configManager.getCurrentModel();
+
+        // Create agent with model config if available
         this.agent = new AgentClass({
-          config: this.agentConfig
+          config: this.agentConfig,
+          modelConfig: currentModel ? {
+            provider: currentModel.provider,
+            modelName: currentModel.modelName,
+            apiKey: currentModel.apiKey,
+            baseUrl: currentModel.baseUrl,
+            maxTokens: currentModel.maxTokens,
+            temperature: currentModel.temperature
+          } : undefined
         });
       }
 

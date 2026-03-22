@@ -117,9 +117,14 @@ describe('ConfigManager', () => {
 
       const config = await manager.load();
       // Should migrate to new format
+      // Note: migrateOldConfig generates ID as "anthropic-claude-3-5-sonnet-20241022"
       expect(config.currentModelId).toBe('anthropic-claude-3-5-sonnet-20241022');
       expect(config.models).toHaveLength(1);
       expect(config.models[0].provider).toBe('anthropic');
+
+      // Verify models.json was created
+      const modelsPath = path.join(testDir, '.devboost', 'models.json');
+      expect(existsSync(modelsPath)).toBe(true);
     });
   });
 
@@ -141,14 +146,22 @@ describe('ConfigManager', () => {
 
       await manager.save(config);
 
-      // Verify file was created
+      // Verify files were created
       expect(existsSync(configPath)).toBe(true);
+      const modelsPath = path.join(testDir, '.devboost', 'models.json');
+      expect(existsSync(modelsPath)).toBe(true);
 
-      // Verify content
+      // Verify config.json has metadata but no models
       const content = await fs.readFile(configPath, 'utf-8');
       const savedConfig = JSON.parse(content);
       expect(savedConfig.currentModelId).toBe('openai-gpt-4');
-      expect(savedConfig.models).toHaveLength(1);
+      expect(savedConfig.models).toBeUndefined();
+
+      // Verify models.json has the models
+      const modelsContent = await fs.readFile(modelsPath, 'utf-8');
+      const savedModels = JSON.parse(modelsContent);
+      expect(savedModels).toHaveLength(1);
+      expect(savedModels[0].id).toBe('openai-gpt-4');
     });
 
     it('should create directory if it does not exist', async () => {

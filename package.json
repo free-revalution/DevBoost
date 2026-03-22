@@ -8,7 +8,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/devboost"
+    "url": "https://github.com/free-revalution/DevBoost.git"
   },
   "scripts": {
     "build": "pnpm -r build",
@@ -16,7 +16,9 @@
     "lint": "pnpm -r lint",
     "clean": "pnpm -r clean && rm -rf node_modules",
     "start": "pnpm --filter @devboost/cli start",
-    "start:simple": "pnpm --filter @devboost/cli start:simple"
+    "start:simple": "pnpm --filter @devboost/cli start:simple",
+    "install:global": "pnpm build && cd packages/cli && pnpm link --global",
+    "uninstall:global": "cd packages/cli && pnpm unlink --global"
   },
   "engines": {
     "node": ">=22.0.0",

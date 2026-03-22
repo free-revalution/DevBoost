@@ -27,16 +27,17 @@ export interface ModelConfig {
 }
 
 /**
- * Main configuration structure
+ * Main configuration structure (config.json - safe to commit)
+ * Models are stored separately in models.json (contains API keys)
  */
 export interface DevBoostConfig {
   version: string;
   currentModelId: string | null;
-  models: ModelConfig[];
   projectPath: string;
   createdAt: string;
   updatedAt: string;
   telegram?: TelegramConfig;
+  // models array is NOT stored here - it's in models.json
 }
 
 /**
@@ -75,54 +76,85 @@ export class ConfigManager {
 
   /**
    * Load configuration from file or return defaults
+   * Returns config with models loaded from models.json
    */
-  async load(): Promise<DevBoostConfig> {
+  async load(): Promise<DevBoostConfig & { models: ModelConfig[] }> {
     try {
-      // Try to load new format config
+      // Load or create metadata config
+      let metadata: Partial<DevBoostConfig>;
+
       if (existsSync(this.configPath)) {
         const content = await fs.readFile(this.configPath, 'utf-8');
-        const config = JSON.parse(content) as Partial<DevBoostConfig>;
+        const parsed = JSON.parse(content);
 
-        // Check if it's new format (has models array)
-        if (config.models && Array.isArray(config.models)) {
-          // Try to load models from models.json (which has unmasked API keys)
-          let models = config.models;
-          if (existsSync(this.modelsPath)) {
-            try {
-              const modelsContent = await fs.readFile(this.modelsPath, 'utf-8');
-              models = JSON.parse(modelsContent);
-            } catch (e) {
-              // If models.json is corrupted, use the models from config.json
-              models = config.models;
-            }
-          }
-
-          return {
-            version: config.version || '0.1.0',
-            currentModelId: config.currentModelId || null,
-            models,
-            projectPath: this.projectPath,
-            createdAt: config.createdAt || new Date().toISOString(),
-            updatedAt: config.updatedAt || new Date().toISOString()
-          };
+        // Handle old format with llmProvider/llmModel (truly old format)
+        if (parsed.llmProvider || parsed.llmModel) {
+          return await this.migrateOldConfig(parsed);
         }
 
-        // Migrate from old format
-        return await this.migrateOldConfig(config);
+        // Handle intermediate format (has models array in config.json)
+        if (parsed.models && Array.isArray(parsed.models)) {
+          // Migrate: move models to models.json
+          const models = parsed.models;
+          await fs.writeFile(this.modelsPath, JSON.stringify(models, null, 2));
+
+          // Remove models from config and save
+          delete parsed.models;
+          await fs.writeFile(this.configPath, JSON.stringify(parsed, null, 2));
+
+          metadata = parsed;
+        } else {
+          metadata = parsed as Partial<DevBoostConfig>;
+        }
+      } else {
+        // Create default metadata
+        metadata = {
+          version: '0.1.0',
+          currentModelId: null,
+          projectPath: this.projectPath,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
       }
 
-      // Create default config
-      return this.createDefaultConfig();
+      // Load models from models.json
+      let models: ModelConfig[] = [];
+      if (existsSync(this.modelsPath)) {
+        try {
+          const modelsContent = await fs.readFile(this.modelsPath, 'utf-8');
+          models = JSON.parse(modelsContent);
+        } catch (e) {
+          // If models.json is corrupted, start with empty array
+          models = [];
+        }
+      }
+
+      return {
+        version: metadata.version || '0.1.0',
+        currentModelId: metadata.currentModelId || null,
+        models,
+        projectPath: this.projectPath,
+        createdAt: metadata.createdAt || new Date().toISOString(),
+        updatedAt: metadata.updatedAt || new Date().toISOString(),
+        telegram: metadata.telegram
+      };
     } catch (error) {
       // If file is corrupted, return defaults
-      return this.createDefaultConfig();
+      return {
+        version: '0.1.0',
+        currentModelId: null,
+        models: [],
+        projectPath: this.projectPath,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
     }
   }
 
   /**
    * Migrate old config format to new format
    */
-  private async migrateOldConfig(oldConfig: any): Promise<DevBoostConfig> {
+  private async migrateOldConfig(oldConfig: any): Promise<DevBoostConfig & { models: ModelConfig[] }> {
     const now = new Date().toISOString();
 
     // If there's a models.json file, load it
@@ -151,7 +183,7 @@ export class ConfigManager {
       }];
     }
 
-    const newConfig: DevBoostConfig = {
+    const newConfig = {
       version: '0.1.0',
       currentModelId: models.length > 0 ? models[0].id : null,
       models,
@@ -166,8 +198,10 @@ export class ConfigManager {
 
   /**
    * Save configuration to file
+   * Saves metadata to config.json (safe to commit)
+   * Saves models with API keys to models.json (gitignored)
    */
-  async save(config: DevBoostConfig): Promise<void> {
+  async save(config: DevBoostConfig & { models: ModelConfig[] }): Promise<void> {
     const configDir = path.dirname(this.configPath);
 
     // Create directory if it doesn't exist
@@ -178,17 +212,28 @@ export class ConfigManager {
     // Update timestamp
     config.updatedAt = new Date().toISOString();
 
-    // Save main config (without API keys in plain text)
-    const configToSave = { ...config };
-    configToSave.models = configToSave.models.map(m => ({
-      ...m,
-      apiKey: m.apiKey ? '***' + m.apiKey.slice(-4) : '' // Hide API key
-    }));
+    // Save metadata to config.json (NO models array, NO API keys)
+    const { models, telegram, ...metadata } = config;
+    const metadataToSave = {
+      ...metadata,
+      // Include telegram with masked botToken if present
+      ...(telegram && {
+        telegram: {
+          ...telegram,
+          botToken: telegram.botToken ? '***' + telegram.botToken.slice(-4) : ''
+        }
+      })
+    };
 
-    await fs.writeFile(this.configPath, JSON.stringify(configToSave, null, 2));
+    await fs.writeFile(this.configPath, JSON.stringify(metadataToSave, null, 2));
 
-    // Save models separately with API keys
-    await fs.writeFile(this.modelsPath, JSON.stringify(config.models, null, 2));
+    // Save models separately with unmasked API keys
+    await fs.writeFile(this.modelsPath, JSON.stringify(models, null, 2));
+
+    // Save telegram config separately if it exists
+    if (telegram && telegram.botToken) {
+      await this.saveTelegramConfig(telegram);
+    }
   }
 
   /**
@@ -375,7 +420,7 @@ export class ConfigManager {
   /**
    * Validate configuration
    */
-  validateConfig(config: Partial<DevBoostConfig>): ValidationResult {
+  validateConfig(config: Partial<DevBoostConfig> & { models?: ModelConfig[] }): ValidationResult {
     const errors: string[] = [];
 
     // Check required fields
@@ -383,6 +428,7 @@ export class ConfigManager {
       errors.push('Missing version');
     }
 
+    // Validate models if provided
     if (config.models) {
       config.models.forEach((model, index) => {
         if (!model.provider) {
@@ -456,7 +502,7 @@ export class ConfigManager {
   /**
    * Create default configuration
    */
-  private createDefaultConfig(): DevBoostConfig {
+  private createDefaultConfig(): DevBoostConfig & { models: ModelConfig[] } {
     const now = new Date().toISOString();
 
     return {

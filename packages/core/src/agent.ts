@@ -8,7 +8,7 @@ import { Message, Role, Tool, ToolResult, AgentConfig } from './types.js';
 import { ToolRegistry } from './registry.js';
 import { IntentParser, IntentType } from './parser.js';
 import { ContextManager, ContextOptions } from './context.js';
-import { ProviderRegistry } from '@devboost/llm';
+import { ProviderRegistry, AnthropicProvider, OpenAICompatibleProvider } from '@devboost/llm';
 import {
   LLMTool,
   FlashToolClass,
@@ -18,9 +18,19 @@ import {
   DetectToolClass
 } from './tools/index.js';
 
+export interface ModelConfig {
+  provider: string;
+  modelName: string;
+  apiKey: string;
+  baseUrl?: string;
+  maxTokens?: number;
+  temperature?: number;
+}
+
 export interface AgentOptions {
   config: AgentConfig;
   context?: ContextOptions;
+  modelConfig?: ModelConfig;
 }
 
 export interface ProcessResult {
@@ -42,9 +52,11 @@ export class Agent {
   private context: ContextManager;
   private llmRegistry: ProviderRegistry;
   private initialized: boolean;
+  private modelConfig?: ModelConfig;
 
   constructor(options: AgentOptions) {
     this.config = options.config;
+    this.modelConfig = options.modelConfig;
     this.registry = new ToolRegistry();
     this.parser = new IntentParser();
     this.context = new ContextManager(options.context);
@@ -209,13 +221,45 @@ export class Agent {
    * Initialize LLM provider from config
    */
   private async initializeLLMProvider(): Promise<void> {
-    // Try to load provider config from ConfigTool
-    const providerType = ConfigTool.getConfigValue('llm.provider') as string || this.config.llmProvider;
-    const model = ConfigTool.getConfigValue('llm.model') as string || this.config.model;
+    // If modelConfig is provided, use it to create the provider
+    if (this.modelConfig) {
+      const { provider, modelName, apiKey, baseUrl, maxTokens, temperature } = this.modelConfig;
 
-    // In a real implementation, this would configure the provider
-    // For now, just log the configuration
-    console.log(`LLM Provider: ${providerType}, Model: ${model}`);
+      // Create provider based on type
+      let providerInstance;
+      switch (provider) {
+        case 'anthropic':
+          providerInstance = new AnthropicProvider(apiKey, modelName);
+          break;
+        case 'openai':
+        case 'openai-compatible':
+          providerInstance = new OpenAICompatibleProvider(baseUrl, apiKey, modelName);
+          break;
+        case 'ollama':
+          // Ollama typically runs on localhost:11434
+          providerInstance = new OpenAICompatibleProvider(
+            baseUrl || 'http://localhost:11434/v1',
+            apiKey || 'ollama', // Ollama doesn't require API key
+            modelName
+          );
+          break;
+        default:
+          throw new Error(`Unknown provider type: ${provider}`);
+      }
+
+      // Register the provider
+      this.llmRegistry.register(provider, providerInstance);
+
+      // Set as current
+      this.llmRegistry.use(provider);
+
+      console.log(`LLM Provider initialized: ${provider}/${modelName}`);
+    } else {
+      // Fallback to old config-based initialization
+      const providerType = ConfigTool.getConfigValue('llm.provider') as string || this.config.llmProvider;
+      const model = ConfigTool.getConfigValue('llm.model') as string || this.config.model;
+      console.log(`LLM Provider: ${providerType}, Model: ${model} (config-based)`);
+    }
   }
 
   /**

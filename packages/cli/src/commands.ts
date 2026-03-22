@@ -112,7 +112,7 @@ export class CommandHandler {
 
   {bold}/help{/bold}                          Show this help message
 
-  {bold}/model{/bold} <command> [args]         Model management (NEW!)
+  {bold}/model{/bold} <command> [args]         Model management
     add                                Add a new model (interactive)
     list                               List all configured models
     switch <id>                         Switch to a model
@@ -137,12 +137,7 @@ export class CommandHandler {
 
   {bold}/clear{/bold}                          Clear the screen
 
-  {bold}/provider{/bold} <command> [args]      Manage LLM providers (legacy)
-    add <type>                          Add a provider
-    use <type>                          Switch to a provider
-    list                                List all providers
-
-  {bold}/telegram{/bold} <command> [args]      Telegram Bot (NEW!)
+  {bold}/telegram{/bold} <command> [args]      Telegram Bot
     init <token>                        Initialize with bot token
     start                               Start Telegram bot
     stop                                Stop Telegram bot
@@ -348,15 +343,39 @@ Initialized: ${this.configManager.exists() ? 'Yes' : 'No'}`;
           return 'Model addition cancelled.';
         }
         return 'No model addition in progress.';
+      case 'provider':
+        if (args.length === 0) {
+          return 'Usage: /model provider <provider-name>\n\nValid providers: anthropic, openai, openai-compatible, ollama';
+        }
+        return await this.handleModelAddProvider(args[0]);
+      case 'name':
+        if (args.length === 0) {
+          return 'Usage: /model name <model-name>';
+        }
+        return await this.handleModelAddName(args.join(' '));
+      case 'key':
+        if (args.length === 0) {
+          return 'Usage: /model key <your-api-key>';
+        }
+        return await this.handleModelAddKey(args.join(' '));
+      case 'url':
+        return await this.handleModelAddBaseUrl(args.join(' '));
+      case 'confirm':
+        return await this.finalizeModelAdd();
       default:
         return `Unknown model action: ${action}
 
 Available actions:
-  add    - Add a new model (interactive)
-  list   - List all configured models
-  switch - Switch to a different model
-  remove - Remove a model
-  cancel - Cancel model addition`;
+  add      - Add a new model (interactive)
+  list     - List all configured models
+  switch   - Switch to a different model
+  remove   - Remove a model
+  cancel   - Cancel model addition
+  provider - Set provider (during add)
+  name     - Set model name (during add)
+  key      - Set API key (during add)
+  url      - Set base URL (during add, optional)
+  confirm  - Confirm and add model (during add)`;
     }
   }
 
@@ -461,6 +480,44 @@ Usage: /model key <your-api-key>`;
 
     this.pendingModelData.apiKey = apiKey.trim();
 
+    // Prompt for optional baseUrl
+    return `API key set.
+
+4. Base URL (Optional)
+   For custom endpoints (e.g., OpenAI-compatible APIs).
+   Leave empty or use /model confirm to skip.
+
+   Usage: /model url <base-url>
+
+   Example: /model url https://api.openai.com/v1
+   Example: /model confirm (to skip)
+
+Type /model confirm to add the model without custom URL.`;
+  }
+
+  /**
+   * Handle model add baseUrl step
+   */
+  async handleModelAddBaseUrl(baseUrl: string): Promise<string> {
+    if (!this.modelAddInProgress) {
+      return 'No model addition in progress. Use /model add to start.';
+    }
+
+    if (!this.pendingModelData.apiKey) {
+      return 'Please set API key first: /model key <your-api-key>';
+    }
+
+    if (baseUrl && baseUrl.trim() !== '') {
+      this.pendingModelData.baseUrl = baseUrl.trim();
+    }
+
+    return await this.finalizeModelAdd();
+  }
+
+  /**
+   * Finalize model addition
+   */
+  async finalizeModelAdd(): Promise<string> {
     // Set default values
     this.pendingModelData.maxTokens = this.pendingModelData.maxTokens || 4096;
     this.pendingModelData.temperature = this.pendingModelData.temperature || 0.7;
@@ -470,7 +527,7 @@ Usage: /model key <your-api-key>`;
       const model = await this.configManager.addModel({
         provider: this.pendingModelData.provider!,
         modelName: this.pendingModelData.modelName!,
-        apiKey: this.pendingModelData.apiKey,
+        apiKey: this.pendingModelData.apiKey!,
         maxTokens: this.pendingModelData.maxTokens,
         temperature: this.pendingModelData.temperature,
         baseUrl: this.pendingModelData.baseUrl
@@ -480,14 +537,22 @@ Usage: /model key <your-api-key>`;
       this.modelAddInProgress = false;
       this.pendingModelData = {};
 
-      return `✓ Model added successfully!
+      let output = `✓ Model added successfully!
 
 Model ID: ${model.id}
 Provider: ${model.provider}
-Model: ${model.modelName}
+Model: ${model.modelName}`;
+
+      if (model.baseUrl) {
+        output += `\nBase URL: ${model.baseUrl}`;
+      }
+
+      output += `
 
 The model has been saved and is ready to use.
 You can switch to it anytime with: /model switch ${model.id}`;
+
+      return output;
     } catch (error) {
       this.modelAddInProgress = false;
       this.pendingModelData = {};
@@ -523,7 +588,14 @@ ${currentMarker}[${model.id}]
   Model: ${model.modelName}
   API Key: ${maskedKey}
   Max Tokens: ${model.maxTokens}
-  Temperature: ${model.temperature}
+  Temperature: ${model.temperature}`;
+
+      if (model.baseUrl) {
+        output += `
+  Base URL: ${model.baseUrl}`;
+      }
+
+      output += `
 `;
     }
 
