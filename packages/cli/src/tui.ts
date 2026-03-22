@@ -94,7 +94,7 @@ export class TUIManager {
       keys: true,
       vi: true,
       tags: true,
-      label: ' {bold}{cyan-fg}Conversation{/cyan-fg}{/bold} ',
+      label: ' Conversation ',
       border: { type: 'line' },
       style: {
         fg: CatppuccinMocha.fg,
@@ -119,13 +119,12 @@ export class TUIManager {
       height: '100%-6',
       scrollable: true,
       tags: true,
-      label: ' {bold}{green-fg}Tasks{/green-fg}{/bold} ',
+      label: ' Tasks ',
       border: { type: 'line' },
       style: {
         fg: CatppuccinMocha.fg,
         bg: CatppuccinMocha.bg,
         border: { fg: CatppuccinMocha.border },
-        label: CatppuccinMocha.green as string,
         selected: { bg: CatppuccinMocha.bgLight, fg: CatppuccinMocha.cyan }
       },
       items: []

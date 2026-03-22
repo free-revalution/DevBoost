@@ -25,7 +25,8 @@
   },
   "dependencies": {
     "@devboost/core": "workspace:*",
-    "@devboost/tui": "workspace:*"
+    "@devboost/tui": "workspace:*",
+    "grammy": "^1.41.1"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

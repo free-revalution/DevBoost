@@ -15,29 +15,29 @@ import {
 const createMockPage = () => {
   const page = {
     goto: vi.fn(),
-    waitForSelector: vi.fn(),
-    waitForURL: vi.fn(),
-    click: vi.fn(),
-    fill: vi.fn(),
+    waitForSelector: vi.fn(() => Promise.resolve()),
+    waitForURL: vi.fn(() => Promise.resolve()),
+    click: vi.fn(() => Promise.resolve()),
+    fill: vi.fn(() => Promise.resolve()),
     inputFiles: vi.fn(),
-    waitForLoadState: vi.fn(),
+    waitForLoadState: vi.fn(() => Promise.resolve()),
     url: vi.fn(() => 'https://jlcpcb.com'),
     screenshot: vi.fn(),
     setDefaultTimeout: vi.fn(),
     locator: vi.fn(() => {
       const mockLocator = {
-        click: vi.fn(),
-        fill: vi.fn(),
+        click: vi.fn(() => Promise.resolve()),
+        fill: vi.fn(() => Promise.resolve()),
         inputFiles: vi.fn(),
         setInputFiles: vi.fn(),
-        waitFor: vi.fn(),
+        waitFor: vi.fn(() => Promise.resolve()),
         isVisible: vi.fn(() => Promise.resolve(false)),
         getTextContent: vi.fn(() => Promise.resolve('test')),
         textContent: vi.fn(() => Promise.resolve('$10.00')),
         count: vi.fn(() => 0),
         first: vi.fn(),
         nth: vi.fn(() => ({ click: vi.fn() })),
-        selectOption: vi.fn(),
+        selectOption: vi.fn(() => Promise.resolve()),
         check: vi.fn(),
         uncheck: vi.fn(),
         isChecked: vi.fn(),
@@ -46,7 +46,7 @@ const createMockPage = () => {
       };
       return mockLocator;
     }),
-    waitForTimeout: vi.fn(),
+    waitForTimeout: vi.fn(() => Promise.resolve()),
     close: vi.fn(),
     on: vi.fn()
   } as unknown as Page;
@@ -72,12 +72,12 @@ describe('LoginPage', () => {
 
   it('should fill email and password', async () => {
     await loginPage.fillCredentials('test@example.com', 'password123');
-    expect(mockPage.locator).toHaveBeenCalledWith(expect.anything());
+    expect(mockPage.fill).toHaveBeenCalled();
   });
 
   it('should click login button', async () => {
     await loginPage.clickLogin();
-    expect(mockPage.locator).toHaveBeenCalledWith(expect.anything());
+    expect(mockPage.click).toHaveBeenCalled();
   });
 
   it('should check if logged in', async () => {
@@ -104,27 +104,9 @@ describe('LoginPage', () => {
   });
 
   it('should login with credentials', async () => {
-    const locator = {
-      isVisible: vi.fn(() => Promise.resolve(false)),
-      click: vi.fn(),
-      fill: vi.fn(),
-      waitFor: vi.fn(),
-      inputFiles: vi.fn(),
-      getTextContent: vi.fn(),
-      count: vi.fn(() => 0),
-      first: vi.fn(),
-      nth: vi.fn(() => ({ click: vi.fn() })),
-      selectOption: vi.fn(),
-      check: vi.fn(),
-      uncheck: vi.fn(),
-      isChecked: vi.fn(),
-      inputValue: vi.fn(),
-      allTextContents: vi.fn(() => Promise.resolve([]))
-    };
-    mockPage.locator = vi.fn(() => locator) as any;
-
     await loginPage.login('test@example.com', 'password123');
-    expect(mockPage.locator).toHaveBeenCalled();
+    expect(mockPage.fill).toHaveBeenCalled();
+    expect(mockPage.click).toHaveBeenCalled();
   });
 });
 
@@ -148,32 +130,13 @@ describe('UploadPage', () => {
   });
 
   it('should wait for upload completion', async () => {
-    const locator = {
-      isVisible: vi.fn(() => Promise.resolve(true)),
-      click: vi.fn(),
-      fill: vi.fn(),
-      waitFor: vi.fn(),
-      inputFiles: vi.fn(),
-      getTextContent: vi.fn(),
-      count: vi.fn(() => 1),
-      first: vi.fn(),
-      nth: vi.fn(() => ({ click: vi.fn() })),
-      selectOption: vi.fn(),
-      check: vi.fn(),
-      uncheck: vi.fn(),
-      isChecked: vi.fn(),
-      inputValue: vi.fn(),
-      allTextContents: vi.fn(() => Promise.resolve([]))
-    };
-    mockPage.locator = vi.fn(() => locator) as any;
-
     const isUploaded = await uploadPage.waitForUpload();
-    expect(locator.isVisible).toHaveBeenCalled();
+    expect(mockPage.waitForSelector).toHaveBeenCalled();
   });
 
   it('should click continue after upload', async () => {
     await uploadPage.clickContinue();
-    expect(mockPage.locator).toHaveBeenCalled();
+    expect(mockPage.click).toHaveBeenCalled();
   });
 
   it('should get upload status', async () => {
@@ -212,7 +175,7 @@ describe('ConfigPage', () => {
 
   it('should set PCB dimensions', async () => {
     await configPage.setDimensions(100, 50);
-    expect(mockPage.locator).toHaveBeenCalled();
+    expect(mockPage.fill).toHaveBeenCalled();
   });
 
   it('should set layer count', async () => {
@@ -222,7 +185,7 @@ describe('ConfigPage', () => {
 
   it('should set quantity', async () => {
     await configPage.setQuantity(10);
-    expect(mockPage.locator).toHaveBeenCalled();
+    expect(mockPage.fill).toHaveBeenCalled();
   });
 
   it('should set thickness', async () => {
@@ -248,6 +211,7 @@ describe('ConfigPage', () => {
       waitFor: vi.fn(),
       inputFiles: vi.fn(),
       getTextContent: vi.fn(() => Promise.resolve('$10.00')),
+      textContent: vi.fn(() => Promise.resolve('$10.00')),
       count: vi.fn(() => 1),
       first: vi.fn(),
       nth: vi.fn(() => ({ click: vi.fn() })),
@@ -266,7 +230,7 @@ describe('ConfigPage', () => {
 
   it('should add to cart', async () => {
     await configPage.addToCart();
-    expect(mockPage.locator).toHaveBeenCalled();
+    expect(mockPage.click).toHaveBeenCalled();
   });
 });
 
@@ -316,6 +280,7 @@ describe('CartPage', () => {
       waitFor: vi.fn(),
       inputFiles: vi.fn(),
       getTextContent: vi.fn(() => Promise.resolve('$50.00')),
+      textContent: vi.fn(() => Promise.resolve('$50.00')),
       count: vi.fn(() => 1),
       first: vi.fn(),
       nth: vi.fn(() => ({ click: vi.fn() })),
@@ -334,12 +299,12 @@ describe('CartPage', () => {
 
   it('should proceed to checkout', async () => {
     await cartPage.proceedToCheckout();
-    expect(mockPage.locator).toHaveBeenCalled();
+    expect(mockPage.click).toHaveBeenCalled();
   });
 
   it('should place order', async () => {
     await cartPage.placeOrder();
-    expect(mockPage.locator).toHaveBeenCalled();
+    expect(mockPage.click).toHaveBeenCalled();
   });
 
   it('should get order confirmation', async () => {
@@ -350,6 +315,7 @@ describe('CartPage', () => {
       waitFor: vi.fn(),
       inputFiles: vi.fn(),
       getTextContent: vi.fn(() => Promise.resolve('Order #12345')),
+      textContent: vi.fn(() => Promise.resolve('Order #12345')),
       count: vi.fn(() => 1),
       first: vi.fn(),
       nth: vi.fn(() => ({ click: vi.fn() })),

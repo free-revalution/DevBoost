@@ -9,6 +9,14 @@ import { ConfigManager } from './config.js';
 import { Agent } from '@devboost/core';
 import { TUIManager } from './tui.js';
 
+// Forward declaration to avoid circular dependency
+interface DevBoostCLIInterface {
+  initializeTelegram(): Promise<boolean>;
+  startTelegram(): Promise<boolean>;
+  stopTelegram(): Promise<boolean>;
+  getTelegramStatus(): { running: boolean; users: number; sessions: number };
+}
+
 export interface ParsedCommand {
   command: string;
   action?: string;
@@ -25,6 +33,7 @@ export class CommandHandler {
     'clear',
     'provider',
     'model',
+    'telegram',
     'devboost'
   ];
 
@@ -42,7 +51,8 @@ export class CommandHandler {
   constructor(
     private configManager: ConfigManager,
     private agent: Agent,
-    private tuiManager: TUIManager
+    private tuiManager: TUIManager,
+    private cli?: DevBoostCLIInterface
   ) {}
 
   parse(input: string): ParsedCommand | null {
@@ -81,6 +91,11 @@ export class CommandHandler {
             return await this.handleModelCommand('list', []);
           }
           return await this.handleModelCommand(command.action, command.args);
+        case 'telegram':
+          if (!command.action) {
+            return 'Usage: /telegram <start|stop|status|users>';
+          }
+          return await this.handleTelegramCommand(command.action, command.args);
         case 'devboost':
           return this.handleDevBoostCommand(command);
         default:
@@ -126,6 +141,15 @@ export class CommandHandler {
     add <type>                          Add a provider
     use <type>                          Switch to a provider
     list                                List all providers
+
+  {bold}/telegram{/bold} <command> [args]      Telegram Bot (NEW!)
+    init <token>                        Initialize with bot token
+    start                               Start Telegram bot
+    stop                                Stop Telegram bot
+    status                              Show bot status
+    add-user <id> [name]                Add authorized user
+    remove-user <id>                    Remove authorized user
+    users                               List authorized users
 
   {bold}/devboost{/bold} <command> [args]      DevBoost project management
     init                                Initialize project
@@ -579,5 +603,105 @@ Use /model list to see available models.`;
 
   setAgentStarted(started: boolean): void {
     this.agentStarted = started;
+  }
+
+  /**
+   * Handle Telegram bot commands
+   */
+  async handleTelegramCommand(action: string, args: string[]): Promise<string> {
+    if (!this.cli) {
+      return 'Telegram integration is not available. Please restart the CLI.';
+    }
+
+    switch (action) {
+      case 'start':
+        const started = await this.cli.startTelegram();
+        if (started) {
+          return '✓ Telegram bot started successfully.\n\nUse /telegram status to check the bot status.';
+        }
+        return '✗ Failed to start Telegram bot.\n\nMake sure Telegram is configured with:\n  /telegram init <bot-token>';
+
+      case 'stop':
+        const stopped = await this.cli.stopTelegram();
+        if (stopped) {
+          return '✓ Telegram bot stopped.';
+        }
+        return '✗ Failed to stop Telegram bot or bot was not running.';
+
+      case 'status':
+        const status = this.cli.getTelegramStatus();
+        return `Telegram Bot Status:
+Running: ${status.running ? 'Yes' : 'No'}
+Authorized Users: ${status.users}
+Active Sessions: ${status.sessions}`;
+
+      case 'init':
+        const token = args[0];
+        if (!token) {
+          return 'Usage: /telegram init <bot-token>\n\nGet your bot token from @BotFather on Telegram.';
+        }
+        try {
+          await this.configManager.initializeTelegramConfig(token);
+          return '✓ Telegram configuration initialized.\n\nAdd authorized users with:\n  /telegram add-user <telegram-id> <name>\n\nThen start the bot with:\n  /telegram start';
+        } catch (error) {
+          return `✗ Failed to initialize Telegram: ${error instanceof Error ? error.message : 'Unknown error'}`;
+        }
+
+      case 'add-user':
+        const userId = args[0];
+        const userName = args[1] || 'User';
+        if (!userId) {
+          return 'Usage: /telegram add-user <telegram-id> [name]\n\nExample: /telegram add-user 123456789 "John Doe"';
+        }
+        try {
+          await this.configManager.addAuthorizedUser({
+            telegramId: userId,
+            name: userName,
+            permissions: ['all']
+          });
+          return `✓ Added user "${userName}" (ID: ${userId}) to authorized users.`;
+        } catch (error) {
+          return `✗ Failed to add user: ${error instanceof Error ? error.message : 'Unknown error'}`;
+        }
+
+      case 'remove-user':
+        const removeUserId = args[0];
+        if (!removeUserId) {
+          return 'Usage: /telegram remove-user <telegram-id>';
+        }
+        const removed = await this.configManager.removeAuthorizedUser(removeUserId);
+        if (removed) {
+          return `✓ Removed user with ID: ${removeUserId}`;
+        }
+        return `✗ User with ID ${removeUserId} not found.`;
+
+      case 'users':
+        // List authorized users
+        const telegramConfig = await this.configManager.getTelegramConfig();
+
+        if (!telegramConfig || telegramConfig.authorizedUsers.length === 0) {
+          return 'No authorized users configured.\n\nAdd users with: /telegram add-user <telegram-id> <name>';
+        }
+
+        let output = 'Authorized Telegram Users:\n';
+        for (const user of telegramConfig.authorizedUsers) {
+          output += `  - ${user.name} (ID: ${user.telegramId})\n`;
+          const perms = user.permissions?.join(', ') || 'all';
+          output += `    Permissions: ${perms}\n`;
+        }
+        return output;
+
+      default:
+        return `Unknown telegram action: ${action}
+
+Available actions:
+  init <token>     - Initialize Telegram with bot token
+  start            - Start the Telegram bot
+  stop             - Stop the Telegram bot
+  status           - Show bot status
+  add-user <id>    - Add authorized user
+  remove-user <id> - Remove authorized user
+  users            - List all authorized users`;
+    }
   }
 }

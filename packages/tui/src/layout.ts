@@ -19,8 +19,8 @@ export class MainLayout {
     this.header = blessed.box({
       parent: this.main,
       top: 0, left: 0, width: '100%', height: 3,
-      content: ' {bold}{cyan-fg}DevBoost{/cyan-fg}{/bold} {gray-fg}v0.1.0{/gray-fg}',
-      tags: true,
+      content: ' DevBoost v0.1.0 ',
+      tags: false,
       style: { bg: theme.bgDark, fg: theme.fg, border: { fg: theme.border } }
     });
 

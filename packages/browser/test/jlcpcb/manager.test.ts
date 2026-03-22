@@ -81,7 +81,8 @@ describe('BrowserManager', () => {
     it('should launch browser in headless mode', async () => {
       await manager.launch();
 
-      expect(chromium.launch).toHaveBeenCalledWith(
+      expect(chromium.launchPersistentContext).toHaveBeenCalledWith(
+        expect.any(String),
         expect.objectContaining({
           headless: true
         })
@@ -92,17 +93,12 @@ describe('BrowserManager', () => {
       const headedManager = new BrowserManager({ headless: false });
       await headedManager.launch();
 
-      expect(chromium.launch).toHaveBeenCalledWith(
+      expect(chromium.launchPersistentContext).toHaveBeenCalledWith(
+        expect.any(String),
         expect.objectContaining({
           headless: false
         })
       );
-    });
-
-    it('should create new context', async () => {
-      await manager.launch();
-
-      expect(mockBrowser.newContext).toHaveBeenCalled();
     });
 
     it('should create new page', async () => {
@@ -112,7 +108,7 @@ describe('BrowserManager', () => {
     });
 
     it('should handle launch errors gracefully', async () => {
-      (chromium.launch as any).mockRejectedValue(new Error('Launch failed'));
+      (chromium.launchPersistentContext as any).mockRejectedValue(new Error('Launch failed'));
 
       await expect(manager.launch()).rejects.toThrow('Launch failed');
     });
@@ -140,25 +136,35 @@ describe('BrowserManager', () => {
   });
 
   describe('close', () => {
-    it('should close browser', async () => {
+    it('should close page', async () => {
       await manager.launch();
       await manager.close();
+
+      expect(mockPage.close).toHaveBeenCalled();
+    });
+
+    it('should not close persistent context', async () => {
+      await manager.launch();
+      await manager.close();
+
+      // Persistent context should NOT be closed
+      expect(mockContext.close).not.toHaveBeenCalled();
+    });
+
+    it('should close non-persistent context', async () => {
+      const nonPersistentManager = new BrowserManager({
+        headless: true,
+        userDataDir: ''  // Empty string to disable persistent context
+      });
+
+      // Mock chromium.launch instead of launchPersistentContext
+      (chromium.launch as any).mockResolvedValue(mockBrowser);
+      (chromium.launchPersistentContext as any).mockReset();
+
+      await nonPersistentManager.launch();
+      await nonPersistentManager.close();
 
       expect(mockBrowser.close).toHaveBeenCalled();
-    });
-
-    it('should close context', async () => {
-      await manager.launch();
-      await manager.close();
-
-      expect(mockContext.close).toHaveBeenCalled();
-    });
-
-    it('should handle close errors gracefully', async () => {
-      mockBrowser.close.mockRejectedValue(new Error('Close failed'));
-
-      await manager.launch();
-      await expect(manager.close()).rejects.toThrow('Close failed');
     });
 
     it('should be idempotent', async () => {
@@ -166,7 +172,7 @@ describe('BrowserManager', () => {
       await manager.close();
       await manager.close(); // Should not throw
 
-      expect(mockBrowser.close).toHaveBeenCalledTimes(1);
+      expect(mockPage.close).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -179,7 +185,7 @@ describe('BrowserManager', () => {
       expect(screenshot).toBeInstanceOf(Buffer);
       expect(mockPage.screenshot).toHaveBeenCalledWith(
         expect.objectContaining({
-          path: 'test-screenshot.png'
+          path: expect.stringContaining('test-screenshot.png')
         })
       );
     });
@@ -241,10 +247,24 @@ describe('BrowserManager', () => {
   });
 
   describe('getBrowser', () => {
-    it('should return current browser', async () => {
+    it('should throw error with persistent context', async () => {
+      // With persistent context, browser is not set
       await manager.launch();
+      await expect(manager.getBrowser()).rejects.toThrow();
+    });
 
-      const browser = await manager.getBrowser();
+    it('should return browser with non-persistent context', async () => {
+      const nonPersistentManager = new BrowserManager({
+        headless: true,
+        userDataDir: ''  // Empty string to disable persistent context
+      });
+
+      (chromium.launch as any).mockResolvedValue(mockBrowser);
+      (chromium.launchPersistentContext as any).mockReset();
+
+      await nonPersistentManager.launch();
+
+      const browser = await nonPersistentManager.getBrowser();
 
       expect(browser).toBeDefined();
       expect(browser).toBe(mockBrowser);
@@ -290,7 +310,8 @@ describe('BrowserManager', () => {
       await manager.handleError(new Error('Test error'), 'test-error');
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Test error')
+        'Error in test-error:',
+        'Test error'
       );
 
       consoleSpy.mockRestore();

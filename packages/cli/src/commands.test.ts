@@ -25,6 +25,7 @@ describe('CommandHandler', () => {
       initialize: vi.fn(),
       getContext: vi.fn(() => ({
         getMessageCount: vi.fn(() => 0),
+        getMessages: vi.fn(() => []),
         clear: vi.fn(),
         getSize: vi.fn(() => 0)
       })),

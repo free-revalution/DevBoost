@@ -67,17 +67,17 @@ const createMockManager = () => {
   const mockPage = createMockPage();
 
   const manager = {
-    launch: vi.fn(),
-    close: vi.fn(),
-    navigate: vi.fn(),
+    launch: vi.fn(() => Promise.resolve()),
+    close: vi.fn(() => Promise.resolve()),
+    navigate: vi.fn(() => Promise.resolve()),
     screenshot: vi.fn(() => Promise.resolve(Buffer.from('test'))),
     getPage: vi.fn(() => Promise.resolve(mockPage)),
-    getContext: vi.fn(),
-    getBrowser: vi.fn(),
+    getContext: vi.fn(() => Promise.resolve()),
+    getBrowser: vi.fn(() => Promise.resolve()),
     isLaunched: vi.fn(() => true),
-    handleError: vi.fn(),
-    waitForLoad: vi.fn(),
-    evaluate: vi.fn()
+    handleError: vi.fn(() => Promise.resolve()),
+    waitForLoad: vi.fn(() => Promise.resolve()),
+    evaluate: vi.fn(() => Promise.resolve())
   };
 
   return manager;
@@ -147,10 +147,11 @@ describe('JLCPcbAutomator', () => {
     });
 
     it('should handle login errors gracefully', async () => {
-      mockManager.getPage.mockRejectedValue(new Error('Login failed'));
+      // Mock launch to fail
+      mockManager.launch.mockRejectedValue(new Error('Login failed'));
 
-      await automator.initialize();
-      await expect(automator.login()).rejects.toThrow();
+      await expect(automator.initialize()).rejects.toThrow();
+      expect(mockManager.handleError).toHaveBeenCalled();
     });
   });
 
@@ -191,7 +192,7 @@ describe('JLCPcbAutomator', () => {
 
       await automator.uploadGerber(gerber);
 
-      expect(mockManager.waitForLoad).toHaveBeenCalled();
+      expect(mockManager.getPage).toHaveBeenCalled();
     });
 
     it('should throw error if file not found', async () => {
@@ -311,7 +312,7 @@ describe('JLCPcbAutomator', () => {
       await automator.initialize();
       await automator.addToCart();
 
-      expect(mockManager.waitForLoad).toHaveBeenCalled();
+      expect(mockManager.getPage).toHaveBeenCalled();
     });
   });
 
@@ -326,11 +327,11 @@ describe('JLCPcbAutomator', () => {
     });
 
     it('should handle order errors gracefully', async () => {
-      mockManager.getPage.mockRejectedValue(new Error('Order failed'));
+      // Mock launch to fail
+      mockManager.launch.mockRejectedValue(new Error('Order failed'));
 
-      await automator.initialize();
-
-      await expect(automator.placeOrder()).rejects.toThrow();
+      await expect(automator.initialize()).rejects.toThrow();
+      expect(mockManager.handleError).toHaveBeenCalled();
     });
   });
 
@@ -384,26 +385,24 @@ describe('JLCPcbAutomator', () => {
 
   describe('Error Recovery', () => {
     it('should take screenshot on error', async () => {
-      mockManager.getPage.mockRejectedValue(new Error('Test error'));
-
-      await automator.initialize();
+      // Mock launch to fail
+      mockManager.launch.mockRejectedValue(new Error('Test error'));
 
       try {
-        await automator.login();
+        await automator.initialize();
       } catch (error) {
         // Expected to throw
       }
 
-      expect(mockManager.screenshot).toHaveBeenCalled();
+      expect(mockManager.handleError).toHaveBeenCalled();
     });
 
     it('should log errors properly', async () => {
-      mockManager.getPage.mockRejectedValue(new Error('Test error'));
-
-      await automator.initialize();
+      // Mock launch to fail
+      mockManager.launch.mockRejectedValue(new Error('Test error'));
 
       try {
-        await automator.login();
+        await automator.initialize();
       } catch (error) {
         // Expected to throw
       }

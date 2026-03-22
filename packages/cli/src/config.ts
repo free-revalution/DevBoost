@@ -36,6 +36,7 @@ export interface DevBoostConfig {
   projectPath: string;
   createdAt: string;
   updatedAt: string;
+  telegram?: TelegramConfig;
 }
 
 /**
@@ -48,6 +49,10 @@ export interface ProviderConfig {
   temperature: number;
 }
 
+// Import and re-export TelegramConfig from telegram module
+import type { TelegramConfig, AuthorizedUser, Permission } from './telegram/config.js';
+export type { TelegramConfig };
+
 export interface ValidationResult {
   valid: boolean;
   errors: string[];
@@ -59,11 +64,13 @@ export class ConfigManager {
   readonly projectPath: string;
   readonly configPath: string;
   private modelsPath: string;
+  private readonly telegramPath: string;
 
   constructor(projectPath: string = process.cwd()) {
     this.projectPath = projectPath;
     this.configPath = path.join(projectPath, '.devboost', 'config.json');
     this.modelsPath = path.join(projectPath, '.devboost', 'models.json');
+    this.telegramPath = path.join(projectPath, '.devboost', 'telegram.json');
   }
 
   /**
@@ -78,10 +85,22 @@ export class ConfigManager {
 
         // Check if it's new format (has models array)
         if (config.models && Array.isArray(config.models)) {
+          // Try to load models from models.json (which has unmasked API keys)
+          let models = config.models;
+          if (existsSync(this.modelsPath)) {
+            try {
+              const modelsContent = await fs.readFile(this.modelsPath, 'utf-8');
+              models = JSON.parse(modelsContent);
+            } catch (e) {
+              // If models.json is corrupted, use the models from config.json
+              models = config.models;
+            }
+          }
+
           return {
             version: config.version || '0.1.0',
             currentModelId: config.currentModelId || null,
-            models: config.models,
+            models,
             projectPath: this.projectPath,
             createdAt: config.createdAt || new Date().toISOString(),
             updatedAt: config.updatedAt || new Date().toISOString()
@@ -497,5 +516,145 @@ export class ConfigManager {
     if (existsSync(this.modelsPath)) {
       await fs.rm(this.modelsPath);
     }
+    if (existsSync(this.telegramPath)) {
+      await fs.rm(this.telegramPath);
+    }
+  }
+
+  /**
+   * Get Telegram configuration
+   */
+  async getTelegramConfig(): Promise<TelegramConfig | null> {
+    const config = await this.load();
+
+    // Try to load from telegram.json (has unmasked token)
+    if (existsSync(this.telegramPath)) {
+      try {
+        const telegramContent = await fs.readFile(this.telegramPath, 'utf-8');
+        return JSON.parse(telegramContent) as TelegramConfig;
+      } catch (e) {
+        // If file is corrupted, return null
+        return null;
+      }
+    }
+
+    // If no telegram.json but config has telegram settings, return those
+    if (config.telegram) {
+      return config.telegram;
+    }
+
+    return null;
+  }
+
+  /**
+   * Save Telegram configuration
+   */
+  async saveTelegramConfig(telegramConfig: TelegramConfig): Promise<void> {
+    const configDir = path.dirname(this.telegramPath);
+
+    // Create directory if it doesn't exist
+    if (!existsSync(configDir)) {
+      await fs.mkdir(configDir, { recursive: true });
+    }
+
+    // Save to telegram.json with full token
+    await fs.writeFile(this.telegramPath, JSON.stringify(telegramConfig, null, 2));
+
+    // Also update main config to reflect enabled status
+    const mainConfig = await this.load();
+    mainConfig.telegram = {
+      ...telegramConfig,
+      botToken: telegramConfig.botToken ? '***' + telegramConfig.botToken.slice(-4) : ''
+    };
+    await this.save(mainConfig);
+  }
+
+  /**
+   * Update Telegram bot token
+   */
+  async updateTelegramBotToken(token: string): Promise<void> {
+    const telegramConfig = await this.getTelegramConfig();
+
+    if (!telegramConfig) {
+      throw new Error('Telegram configuration not found. Initialize it first.');
+    }
+
+    telegramConfig.botToken = token;
+    await this.saveTelegramConfig(telegramConfig);
+  }
+
+  /**
+   * Add authorized Telegram user
+   */
+  async addAuthorizedUser(user: {
+    telegramId: string;
+    name: string;
+    permissions: string[];
+  }): Promise<void> {
+    const telegramConfig = await this.getTelegramConfig();
+
+    if (!telegramConfig) {
+      throw new Error('Telegram configuration not found. Initialize it first.');
+    }
+
+    const authorizedUser: AuthorizedUser = {
+      telegramId: user.telegramId,
+      name: user.name,
+      permissions: user.permissions as Permission[]
+    };
+
+    const existingIndex = telegramConfig.authorizedUsers.findIndex(
+      (u: AuthorizedUser) => u.telegramId === user.telegramId
+    );
+
+    if (existingIndex >= 0) {
+      // Update existing user
+      telegramConfig.authorizedUsers[existingIndex] = authorizedUser;
+    } else {
+      // Add new user
+      telegramConfig.authorizedUsers.push(authorizedUser);
+    }
+
+    await this.saveTelegramConfig(telegramConfig);
+  }
+
+  /**
+   * Remove authorized Telegram user
+   */
+  async removeAuthorizedUser(telegramId: string): Promise<boolean> {
+    const telegramConfig = await this.getTelegramConfig();
+
+    if (!telegramConfig) {
+      return false;
+    }
+
+    const index = telegramConfig.authorizedUsers.findIndex(
+      (u: AuthorizedUser) => u.telegramId === telegramId
+    );
+
+    if (index === -1) {
+      return false;
+    }
+
+    telegramConfig.authorizedUsers.splice(index, 1);
+    await this.saveTelegramConfig(telegramConfig);
+    return true;
+  }
+
+  /**
+   * Initialize default Telegram configuration
+   */
+  async initializeTelegramConfig(botToken: string): Promise<TelegramConfig> {
+    const defaultConfig: TelegramConfig = {
+      enabled: true,
+      botToken,
+      authorizedUsers: [],
+      notifications: true,
+      remoteControl: true,
+      aiConversation: true
+    };
+
+    await this.saveTelegramConfig(defaultConfig);
+    return defaultConfig;
   }
 }
