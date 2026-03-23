@@ -28,7 +28,19 @@ vi.mock('@devboost/tui', () => ({
     },
     render: vi.fn()
   })),
-  CatppuccinMocha: {}
+  CatppuccinMocha: {},
+  App: vi.fn().mockImplementation(() => ({
+    start: vi.fn(),
+    getScreen: vi.fn().mockReturnValue({
+      render: vi.fn(),
+      key: vi.fn(),
+      destroy: vi.fn()
+    }),
+    getEventManager: vi.fn().mockReturnValue({
+      on: vi.fn(),
+      registerKey: vi.fn()
+    })
+  }))
 }));
 
 describe('DevBoostCLI', () => {
@@ -54,7 +66,7 @@ describe('DevBoostCLI', () => {
 
     mockConfigManager = {
       load: vi.fn().mockResolvedValue({
-        version: '0.1.0',
+        version: '0.2.0',
         llmProvider: 'anthropic',
         llmModel: 'claude-sonnet-4-20250514',
         maxTokens: 4096,
@@ -88,7 +100,7 @@ describe('DevBoostCLI', () => {
 
   describe('constructor', () => {
     it('should create instance with version', () => {
-      expect(cli.version).toBe('0.1.0');
+      expect(cli.version).toBe('0.2.0');
     });
 
     it('should create instance with dependencies', () => {
@@ -101,7 +113,7 @@ describe('DevBoostCLI', () => {
     it('should create instance with default dependencies', () => {
       const defaultCli = new DevBoostCLI();
       expect(defaultCli).toBeDefined();
-      expect(defaultCli.version).toBe('0.1.0');
+      expect(defaultCli.version).toBe('0.2.0');
     });
   });
 
@@ -142,6 +154,8 @@ describe('DevBoostCLI', () => {
       const startLoopSpy = vi.spyOn(cli, 'startMainLoop').mockResolvedValue();
 
       // Mock createTUIComponents to avoid actual TUI creation
+      // Set useNewTUI to false for legacy behavior in tests
+      cli['useNewTUI'] = false;
       vi.spyOn(cli as any, 'createTUIComponents').mockImplementation(() => {
         cli['mainLoop'] = { start: vi.fn().mockResolvedValue() } as any;
       });
@@ -157,6 +171,8 @@ describe('DevBoostCLI', () => {
       const startLoopSpy = vi.spyOn(cli, 'startMainLoop').mockResolvedValue();
 
       // Mock createTUIComponents to avoid actual TUI creation
+      // Set useNewTUI to false for legacy behavior in tests
+      cli['useNewTUI'] = false;
       vi.spyOn(cli as any, 'createTUIComponents').mockImplementation(() => {
         cli['mainLoop'] = { start: vi.fn().mockResolvedValue() } as any;
       });
@@ -450,7 +466,7 @@ describe('DevBoostCLI', () => {
     it('should return true after initialization', async () => {
       // Don't mock initialize - let it run to set internal state
       mockConfigManager.load = vi.fn().mockResolvedValue({
-        version: '0.1.0',
+        version: '0.2.0',
         llmProvider: 'anthropic',
         llmModel: 'claude-sonnet-4-20250514',
         maxTokens: 4096,
@@ -471,7 +487,7 @@ describe('DevBoostCLI', () => {
   describe('getVersion', () => {
     it('should return version string', () => {
       const version = cli.getVersion();
-      expect(version).toBe('0.1.0');
+      expect(version).toBe('0.2.0');
     });
   });
 
@@ -491,6 +507,12 @@ describe('DevBoostCLI', () => {
     it('should handle main loop start errors', async () => {
       vi.spyOn(cli, 'initialize').mockResolvedValue();
       vi.spyOn(cli, 'startMainLoop').mockRejectedValue(new Error('Loop start failed'));
+
+      // Set useNewTUI to false to test legacy TUI error handling
+      cli['useNewTUI'] = false;
+      vi.spyOn(cli as any, 'createTUIComponents').mockImplementation(() => {
+        cli['mainLoop'] = { start: vi.fn().mockRejectedValue(new Error('Loop start failed')) } as any;
+      });
 
       await expect(cli.run()).rejects.toThrow('Loop start failed');
     });

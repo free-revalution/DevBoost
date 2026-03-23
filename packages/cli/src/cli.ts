@@ -9,6 +9,7 @@ import { Agent, AgentConfig, Role } from '@devboost/core';
 import { ScreenManager } from '@devboost/tui';
 import { CatppuccinMocha } from '@devboost/tui';
 import { TUIManager } from './tui.js';
+import { NewTUIManager } from './new-tui.js';
 import { ProjectManager } from './project.js';
 import { CommandHandler } from './commands.js';
 import { ConfigManager } from './config.js';
@@ -17,19 +18,21 @@ import { TelegramBot, TelegramConfig } from './telegram/index.js';
 import { SessionManager } from './session/index.js';
 
 export class DevBoostCLI {
-  readonly version = '0.1.0';
+  readonly version = '0.2.0';
 
   private agent: Agent | null = null;
   private configManager: ConfigManager;
   private projectManager: ProjectManager;
   private screenManager: ScreenManager | null = null;
   private tuiManager: TUIManager | null = null;
+  private newTuiManager: NewTUIManager | null = null;
   private commandHandler: CommandHandler | null = null;
   private mainLoop: MainLoop | null = null;
   private initialized: boolean = false;
   private agentConfig: AgentConfig;
   private telegramBot: TelegramBot | null = null;
   private sessionManager: SessionManager | null = null;
+  private useNewTUI: boolean = true; // Default to new TUI
 
   constructor(
     agent?: Agent,
@@ -103,8 +106,11 @@ export class DevBoostCLI {
       // Create TUI components
       this.createTUIComponents();
 
-      // Start main loop
-      await this.startMainLoop();
+      // Start main loop (only for legacy TUI)
+      if (!this.useNewTUI) {
+        await this.startMainLoop();
+      }
+      // New TUI is started automatically in createTUIComponents
 
     } catch (error) {
       // Handle initialization errors
@@ -117,6 +123,47 @@ export class DevBoostCLI {
    * Create TUI components
    */
   private createTUIComponents(): void {
+    if (!this.agent) {
+      throw new Error('Agent not initialized. Call initialize() first.');
+    }
+
+    if (this.useNewTUI) {
+      // Use new panel-driven TUI
+      this.createNewTUIComponents();
+    } else {
+      // Use legacy TUI
+      this.createLegacyTUIComponents();
+    }
+  }
+
+  /**
+   * Create new TUI components (panel-driven)
+   */
+  private createNewTUIComponents(): void {
+    if (!this.agent) {
+      throw new Error('Agent not initialized. Call initialize() first.');
+    }
+
+    this.newTuiManager = new NewTUIManager(this.agent, this.configManager);
+
+    // Create command handler with new TUI
+    this.commandHandler = new CommandHandler(
+      this.configManager,
+      this.agent,
+      this.newTuiManager as any, // Type assertion for compatibility
+      this
+    );
+
+    // Initialize new TUI
+    this.newTuiManager.initialize().catch(error => {
+      console.error('Failed to initialize new TUI:', error);
+    });
+  }
+
+  /**
+   * Create legacy TUI components
+   */
+  private createLegacyTUIComponents(): void {
     if (!this.agent) {
       throw new Error('Agent not initialized. Call initialize() first.');
     }
@@ -144,11 +191,13 @@ export class DevBoostCLI {
     );
 
     // Register quit handler with screen manager
-    this.screenManager.onQuit(async () => {
-      console.log('\nShutting down gracefully...');
-      await this.shutdown();
-      process.exit(0);
-    });
+    if (this.screenManager) {
+      this.screenManager.onQuit(async () => {
+        console.log('\nShutting down gracefully...');
+        await this.shutdown();
+        process.exit(0);
+      });
+    }
 
     // Setup signal handlers for graceful shutdown
     this.setupSignalHandlers();
@@ -209,7 +258,7 @@ export class DevBoostCLI {
         await this.stopTelegram();
       }
 
-      // Stop main loop
+      // Stop main loop (legacy TUI only)
       if (this.mainLoop) {
         await this.mainLoop.stop();
       }
@@ -219,12 +268,17 @@ export class DevBoostCLI {
         await this.agent.shutdown();
       }
 
-      // Destroy TUI
+      // Destroy TUI (legacy)
       if (this.tuiManager) {
         this.tuiManager.destroy();
       }
 
-      // Destroy screen manager
+      // Destroy new TUI
+      if (this.newTuiManager) {
+        this.newTuiManager.destroy();
+      }
+
+      // Destroy screen manager (legacy)
       if (this.screenManager) {
         this.screenManager.destroy();
       }
