@@ -28,6 +28,7 @@ export interface AppConfig {
   themeManager?: ThemeManager;
   panels?: PanelRegistration[];
   onQuit?: () => void | Promise<void>;
+  onInput?: (input: string) => void | Promise<void>;
 }
 
 /**
@@ -46,17 +47,20 @@ export class App {
   private statusBar!: ReturnType<typeof blessed.box>;
   private inputBox!: ReturnType<typeof blessed.textbox>;
   private onQuitCallback?: () => void | Promise<void>;
+  private onInputCallback?: (input: string) => void | Promise<void>;
 
   constructor(config: AppConfig = {}) {
     this.themeManager = config.themeManager || new ThemeManager();
     this.panels = new Map();
     this.currentPanel = null;
     this.onQuitCallback = config.onQuit;
+    this.onInputCallback = config.onInput;
 
     // Create blessed screen
     this.screen = blessed.screen({
       smartCSR: true,
-      fullUnicode: false
+      fullUnicode: true,  // Enable Unicode for Chinese character support
+      title: 'DevBoost TUI'
     });
 
     // Create event manager
@@ -137,6 +141,7 @@ export class App {
       width: '100%',
       height: 3,
       inputOnFocus: true,
+      keys: true,
       prompt: '> ',
       style: {
         fg: this.theme.fg,
@@ -148,6 +153,26 @@ export class App {
       border: {
         type: 'line'
       }
+    } as any);
+
+    // Handle input submission (Enter key)
+    this.inputBox.on('submit', async () => {
+      const input = this.inputBox.getValue();
+      if (input && input.trim()) {
+        this.inputBox.clearValue();
+        if (this.onInputCallback) {
+          await this.onInputCallback(input.trim());
+        }
+      }
+      this.screen.render();
+    });
+
+    // Handle escape key to clear input
+    this.screen.key(['escape'], () => {
+      // Check if input box has focus by checking if it's the current focused element
+      // We can check by trying to see if a key event would go to input
+      this.inputBox.clearValue();
+      this.screen.render();
     });
   }
 

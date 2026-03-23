@@ -144,7 +144,7 @@ export class DevBoostCLI {
       throw new Error('Agent not initialized. Call initialize() first.');
     }
 
-    this.newTuiManager = new NewTUIManager(this.agent, this.configManager);
+    this.newTuiManager = new NewTUIManager(this.agent, this.configManager, this);
 
     // Create command handler with new TUI
     this.commandHandler = new CommandHandler(

@@ -18,10 +18,12 @@ export class NewTUIManager {
   private configManager: ConfigManager;
   private themeManager: ThemeManager;
   private initialized: boolean = false;
+  private cli: any; // Reference to CLI for input handling
 
-  constructor(agent: Agent, configManager: ConfigManager) {
+  constructor(agent: Agent, configManager: ConfigManager, cli?: any) {
     this.agent = agent;
     this.configManager = configManager;
+    this.cli = cli;
 
     // Create theme manager
     this.themeManager = new ThemeManager();
@@ -31,6 +33,9 @@ export class NewTUIManager {
       themeManager: this.themeManager,
       onQuit: async () => {
         await this.cleanup();
+      },
+      onInput: async (input: string) => {
+        await this.handleInput(input);
       }
     });
 
@@ -211,6 +216,151 @@ export class NewTUIManager {
   }
 
   /**
+   * Handle user input from the input box
+   */
+  private async handleInput(input: string): Promise<void> {
+    const trimmed = input.trim();
+
+    if (!trimmed) {
+      return;
+    }
+
+    // Check if this is a command
+    if (trimmed.startsWith('/')) {
+      await this.handleCommand(trimmed);
+    } else {
+      // Regular message - send to agent
+      await this.handleMessage(trimmed);
+    }
+  }
+
+  /**
+   * Handle command input
+   */
+  private async handleCommand(input: string): Promise<void> {
+    const parts = input.slice(1).split(/\s+/);
+    const command = parts[0];
+    const action = parts[1];
+    const args = parts.slice(2);
+
+    switch (command) {
+      case 'quit':
+      case 'exit':
+      case 'q':
+        await this.app.quit();
+        break;
+
+      case 'help':
+      case '?':
+        this.showHelp();
+        break;
+
+      case 'agent':
+        await this.handleAgentCommand(action, args);
+        break;
+
+      case 'model':
+        await this.handleModelCommand(action);
+        break;
+
+      case 'clear':
+        this.clearConversation();
+        break;
+
+      default:
+        this.app.getNotificationManager().warning(`未知命令: ${command}`);
+    }
+  }
+
+  /**
+   * Handle agent commands
+   */
+  private async handleAgentCommand(action: string | undefined, args: string[]): Promise<void> {
+    switch (action) {
+      case 'start':
+        this.app.getNotificationManager().info('Agent 启动中...');
+        // Agent start logic would go here
+        break;
+
+      case 'stop':
+        this.app.getNotificationManager().info('Agent 已停止');
+        // Agent stop logic would go here
+        break;
+
+      case 'status':
+        const status = 'stopped'; // Would get actual status
+        this.app.getNotificationManager().info(`Agent 状态: ${status}`);
+        break;
+
+      default:
+        this.app.getNotificationManager().warning('用法: /agent start|stop|status');
+    }
+  }
+
+  /**
+   * Handle model commands
+   */
+  private async handleModelCommand(action: string | undefined): Promise<void> {
+    if (action === 'list') {
+      const models = await this.configManager.getAllModels();
+      this.app.getNotificationManager().info(`可用模型: ${models.length} 个`);
+    } else {
+      this.app.getNotificationManager().info('使用 /model 命令管理模型');
+    }
+  }
+
+  /**
+   * Handle regular message
+   */
+  private async handleMessage(message: string): Promise<void> {
+    try {
+      // Add user message to context
+      const context = this.agent.getContext();
+      await context.addMessage({ role: Role.User, content: message });
+
+      // Process with agent
+      const result = await this.agent.process(message);
+
+      // Display response
+      this.app.getNotificationManager().success('处理完成');
+      // In a full implementation, would update the chat panel with response
+    } catch (error) {
+      this.app.getNotificationManager().error(`处理失败: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Show help
+   */
+  private showHelp(): void {
+    const helpText = `
+可用命令:
+  /help, /?     显示此帮助
+  /agent start  启动 Agent
+  /agent stop   停止 Agent
+  /model list   查看模型列表
+  /clear        清空对话
+  /quit, /q     退出
+
+快捷键:
+  1-5          切换面板
+  h/j/k/l       vim 风格导航
+  T            切换主题
+  x/?          显示选项菜单
+`;
+    this.app.getNotificationManager().info(helpText);
+  }
+
+  /**
+   * Clear conversation
+   */
+  private clearConversation(): void {
+    const context = this.agent.getContext();
+    context.clear();
+    this.app.getNotificationManager().info('对话已清空');
+  }
+
+  /**
    * Display a message in the chat
    */
   displayMessage(role: 'user' | 'assistant' | 'system', content: string): void {
@@ -223,15 +373,7 @@ export class NewTUIManager {
    */
   showStatus(message: string): void {
     // Update status bar or show notification
-    // For now, this is a placeholder
-  }
-
-  /**
-   * Clear conversation
-   */
-  clearConversation(): void {
-    const context = this.agent.getContext();
-    context.clear();
+    this.app.getNotificationManager().info(message);
   }
 
   /**
