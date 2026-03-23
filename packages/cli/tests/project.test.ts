@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { ProjectManager } from './project.js';
+import { ProjectManager } from '../src/project.js';
 import { rm } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 

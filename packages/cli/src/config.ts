@@ -65,11 +65,40 @@ export class ConfigManager {
   private modelsPath: string;
   private readonly telegramPath: string;
 
-  constructor(projectPath: string = process.cwd()) {
-    this.projectPath = projectPath;
-    this.configPath = path.join(projectPath, '.devboost', 'config.json');
-    this.modelsPath = path.join(projectPath, '.devboost', 'models.json');
-    this.telegramPath = path.join(projectPath, '.devboost', 'telegram.json');
+  constructor(projectPath?: string) {
+    // If no projectPath provided, find the monorepo root
+    this.projectPath = projectPath || this.findProjectRoot();
+    this.configPath = path.join(this.projectPath, '.devboost', 'config.json');
+    this.modelsPath = path.join(this.projectPath, '.devboost', 'models.json');
+    this.telegramPath = path.join(this.projectPath, '.devboost', 'telegram.json');
+  }
+
+  /**
+   * Find the project root by looking for package.json or pnpm-workspace.yaml
+   * This ensures .devboost is always at the monorepo root, not in subdirectories
+   */
+  private findProjectRoot(startPath: string = process.cwd()): string {
+    let currentPath = startPath;
+
+    while (currentPath !== path.parse(currentPath).root) {
+      // Check for monorepo markers
+      const hasPnpmWorkspace = existsSync(path.join(currentPath, 'pnpm-workspace.yaml'));
+      const hasPackageJson = existsSync(path.join(currentPath, 'package.json'));
+
+      if (hasPnpmWorkspace || hasPackageJson) {
+        // Check if this is a monorepo root by looking for packages directory
+        const packagesDir = existsSync(path.join(currentPath, 'packages'));
+        if (packagesDir || hasPnpmWorkspace) {
+          return currentPath;
+        }
+      }
+
+      // Move up one directory
+      currentPath = path.dirname(currentPath);
+    }
+
+    // Fallback to current directory if no root found
+    return startPath;
   }
 
   /**

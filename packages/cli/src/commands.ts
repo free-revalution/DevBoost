@@ -1,13 +1,15 @@
 /**
- * Enhanced Command Handler for DevBoost CLI
+ * Command Handler for DevBoost CLI
  *
  * Handles all CLI commands including agent management,
  * context operations, tools listing, and history.
+ * Model management has been moved to a separate module.
  */
 
 import { ConfigManager } from './config.js';
 import { Agent } from '@devboost/core';
 import { TUIManager } from './tui.js';
+import { ModelCommands } from './model-commands.js';
 
 // Forward declaration to avoid circular dependency
 interface DevBoostCLIInterface {
@@ -31,7 +33,6 @@ export class CommandHandler {
     'tools',
     'history',
     'clear',
-    'provider',
     'model',
     'telegram',
     'devboost',
@@ -40,22 +41,16 @@ export class CommandHandler {
   ];
 
   private agentStarted: boolean = false;
-  private modelAddInProgress: boolean = false;
-  private pendingModelData: {
-    provider?: string;
-    modelName?: string;
-    apiKey?: string;
-    maxTokens?: number;
-    temperature?: number;
-    baseUrl?: string;
-  } = {};
+  private modelCommands: ModelCommands;
 
   constructor(
     private configManager: ConfigManager,
     private agent: Agent,
     private tuiManager: TUIManager,
     private cli?: DevBoostCLIInterface
-  ) {}
+  ) {
+    this.modelCommands = new ModelCommands(configManager);
+  }
 
   parse(input: string): ParsedCommand | null {
     if (!input.startsWith('/')) return null;
@@ -86,13 +81,13 @@ export class CommandHandler {
           return await this.handleHistoryCommand(command.args[0] ? parseInt(command.args[0]) : 10);
         case 'clear':
           return this.handleClearCommand();
-        case 'provider':
-          return this.handleProviderCommand(command);
         case 'model':
-          if (!command.action) {
-            return await this.handleModelCommand('list', []);
+          // Get screen from TUI manager
+          const screen = (this.tuiManager.getLayout() as any)?.screen;
+          if (!screen) {
+            return 'TUI not initialized. Please restart the CLI.';
           }
-          return await this.handleModelCommand(command.action, command.args);
+          return await this.modelCommands.handleModelCommand(screen);
         case 'telegram':
           if (!command.action) {
             return 'Usage: /telegram <start|stop|status|users>';
@@ -117,11 +112,8 @@ export class CommandHandler {
 
   {bold}/help{/bold}                          Show this help message
 
-  {bold}/model{/bold} [args]                    Model management
-    /model                             Show model list & menu
-    /model add <name> <url> <key>        Add a new model
-    /model switch <id>                  Switch to a model
-    /model remove <id>                  Remove a model
+  {bold}/model{/bold}                         Model management (interactive menu)
+    ↑↓ Navigate  • Enter Select  • Esc Cancel
 
   {bold}/agent{/bold} <action>                 Agent management
     start                               Start the agent
@@ -262,41 +254,6 @@ Last updated: ${new Date().toISOString()}`;
     return '✓ Screen cleared';
   }
 
-  handleProviderCommand(command: ParsedCommand): string {
-    if (!command.action) {
-      return 'Usage: /provider <add|use|list|remove> [args]';
-    }
-
-    switch (command.action) {
-      case 'add':
-        const providerType = command.args[0];
-        if (!providerType) {
-          return 'Usage: /provider add <type>';
-        }
-        return `Provider "${providerType}" would be added here. Implementation pending.`;
-
-      case 'use':
-        const useType = command.args[0];
-        if (!useType) {
-          return 'Usage: /provider use <type>';
-        }
-        return `Switched to provider "${useType}". (Not yet implemented)`;
-
-      case 'list':
-        return 'Available providers: anthropic, openai, openai-compatible, ollama';
-
-      case 'remove':
-        const removeType = command.args[0];
-        if (!removeType) {
-          return 'Usage: /provider remove <type>';
-        }
-        return `Provider "${removeType}" would be removed here. Implementation pending.`;
-
-      default:
-        return `Unknown provider action: ${command.action}`;
-    }
-  }
-
   handleDevBoostCommand(command: ParsedCommand): string {
     if (!command.action) {
       return 'Usage: /devboost <init|clean|reset|info>';
@@ -317,423 +274,6 @@ Initialized: ${this.configManager.exists() ? 'Yes' : 'No'}`;
       default:
         return `Unknown devboost action: ${command.action}`;
     }
-  }
-
-  /**
-   * Handle model management commands
-   */
-  async handleModelCommand(action: string, args: string[]): Promise<string> {
-    // If no action specified, show model list and menu
-    if (!action) {
-      return await this.handleModelMenu();
-    }
-
-    switch (action) {
-      case 'add':
-        // /model add <name> <url> <apiKey>
-        if (args.length >= 3) {
-          return await this.handleQuickAdd(args[0], args[1], args[2]);
-        }
-        return `Usage: /model add <name> <url> <apiKey>
-
-Example: /model add deepseek https://api.deepseek.com/v1 sk-xxxxx
-
- name  - Model name (e.g., deepseek, gpt-4, etc.)
- url   - API endpoint URL (e.g., https://api.deepseek.com/v1)
- key   - Your API key`;
-      case 'list':
-        return await this.handleModelList();
-      case 'switch':
-        if (args.length === 0) {
-          return 'Usage: /model switch <model-id>\n\nUse /model to see available models.';
-        }
-        return await this.handleModelSwitch(args[0]);
-      case 'remove':
-        if (args.length === 0) {
-          return 'Usage: /model remove <model-id>\n\nUse /model to see available models.';
-        }
-        return await this.handleModelRemove(args[0]);
-      default:
-        return `Unknown action: ${action}
-
-Use /model to see available models and options.`;
-    }
-  }
-
-  /**
-   * Show model menu with list and options
-   */
-  async handleModelMenu(): Promise<string> {
-    const models = await this.configManager.getAllModels();
-    const currentModel = await this.configManager.getCurrentModel();
-
-    if (models.length === 0) {
-      return `╔═══════════════════════════════════════════════════════════════╗
-║                      🤖 Model Management                        ║
-╠═══════════════════════════════════════════════════════════════╣
-║  No models configured yet.                                    ║
-║                                                                ║
-║  Add your first model:                                         ║
-║  /model add <name> <url> <apiKey>                             ║
-║                                                                ║
-║  Example:                                                      ║
-║  /model add deepseek https://api.deepseek.com/v1 sk-xxxxx      ║
-╚═══════════════════════════════════════════════════════════════╝`;
-    }
-
-    let output = `╔═══════════════════════════════════════════════════════════════╗
-║                      🤖 Model Management (${models.length})              ║
-╠═══════════════════════════════════════════════════════════════╣`;
-
-    for (let i = 0; i < models.length; i++) {
-      const model = models[i];
-      const isCurrent = currentModel?.id === model.id;
-      const currentMark = isCurrent ? ' → ' : '   ';
-      const num = (i + 1).toString().padStart(2, ' ');
-
-      const maskedKey = model.apiKey ? `***${model.apiKey.slice(-4)}` : '(no key)';
-      const name = model.modelName.length > 20 ? model.modelName.substring(0, 20) + '...' : model.modelName.padEnd(23);
-
-      output += `\n║ ${currentMark}[${num}] ${name} Key: ${maskedKey}`;
-
-      if (model.baseUrl) {
-        const url = model.baseUrl.length > 30 ? model.baseUrl.substring(0, 30) + '...' : model.baseUrl;
-        output += `\n║       URL: ${url.padEnd(47)}║`;
-      } else {
-        output += `\n║       ${' '.repeat(55)}║`;
-      }
-    }
-
-    output += `\n╠═══════════════════════════════════════════════════════════════╣
-║ Commands:                                                     ║
-║  /model add <name> <url> <key>   Add a new model               ║
-║  /model switch <id>               Switch to a model             ║
-║  /model remove <id>               Remove a model               ║
-║  /model list                     Show this menu                 ║
-╚═══════════════════════════════════════════════════════════════╝`;
-
-    return output;
-  }
-
-  /**
-   * Quick add model in one command
-   */
-  async handleQuickAdd(name: string, url: string, apiKey: string): Promise<string> {
-    try {
-      // Generate a simple ID from the name
-      const id = name.toLowerCase().replace(/[^a-z0-9]/g, '-');
-
-      const model = await this.configManager.addModel({
-        provider: 'custom', // All models are now "custom"
-        modelName: name,
-        apiKey: apiKey,
-        baseUrl: url,
-        maxTokens: 4096,
-        temperature: 0.7
-      });
-
-      return `✓ Model added successfully!
-
-Model ID: ${id}
-Name: ${name}
-URL: ${url}
-
-The model is now ready to use.
-Type /model to see all models.`;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      return `✗ Failed to add model: ${errorMessage}`;
-    }
-  }
-
-  /**
-   * Handle model add (interactive) - DEPRECATED, kept for backward compatibility
-   */
-  async handleModelAdd(): Promise<string> {
-    if (this.modelAddInProgress) {
-      return 'Model addition already in progress. Use /model cancel to cancel or continue with: /model add';
-    }
-
-    this.modelAddInProgress = true;
-    this.pendingModelData = {};
-
-    return `Adding a new model...
-
-Please provide the following information (one at a time):
-
-1. Provider (anthropic, openai, openai-compatible, ollama)
-   Usage: /model provider <provider-name>
-
-Example: /model provider anthropic
-
-Type /model cancel to cancel at any time.`;
-  }
-
-  /**
-   * Handle model add provider step
-   */
-  async handleModelAddProvider(provider: string): Promise<string> {
-    if (!this.modelAddInProgress) {
-      return 'No model addition in progress. Use /model add to start.';
-    }
-
-    const validProviders = ['anthropic', 'openai', 'openai-compatible', 'ollama'];
-    if (!validProviders.includes(provider)) {
-      return `Invalid provider: ${provider}
-
-Valid providers: ${validProviders.join(', ')}
-
-Usage: /model provider <provider-name>`;
-    }
-
-    this.pendingModelData.provider = provider;
-
-    return `Provider set to: ${provider}
-
-2. Model Name
-   Usage: /model name <model-name>
-
-Examples:
-   Anthropic: claude-3-5-sonnet-20241022, claude-3-opus-20240229
-   OpenAI: gpt-4, gpt-3.5-turbo
-   Ollama: llama2, mistral
-
-Usage: /model name <model-name>`;
-  }
-
-  /**
-   * Handle model add name step
-   */
-  async handleModelAddName(modelName: string): Promise<string> {
-    if (!this.modelAddInProgress) {
-      return 'No model addition in progress. Use /model add to start.';
-    }
-
-    if (!this.pendingModelData.provider) {
-      return 'Please set provider first: /model provider <provider>';
-    }
-
-    if (!modelName || modelName.trim() === '') {
-      return 'Model name cannot be empty.';
-    }
-
-    this.pendingModelData.modelName = modelName.trim();
-
-    return `Model name set to: ${modelName}
-
-3. API Key
-   Usage: /model key <your-api-key>
-
-Note: Your API key will be stored securely in .devboost/models.json
-
-Usage: /model key <your-api-key>`;
-  }
-
-  /**
-   * Handle model add API key step
-   */
-  async handleModelAddKey(apiKey: string): Promise<string> {
-    if (!this.modelAddInProgress) {
-      return 'No model addition in progress. Use /model add to start.';
-    }
-
-    if (!this.pendingModelData.modelName) {
-      return 'Please set model name first: /model name <model-name>';
-    }
-
-    if (!apiKey || apiKey.trim() === '') {
-      return 'API key cannot be empty.';
-    }
-
-    this.pendingModelData.apiKey = apiKey.trim();
-
-    // Prompt for optional baseUrl
-    return `API key set.
-
-4. Base URL (Optional)
-   For custom endpoints (e.g., OpenAI-compatible APIs).
-   Leave empty or use /model confirm to skip.
-
-   Usage: /model url <base-url>
-
-   Example: /model url https://api.openai.com/v1
-   Example: /model confirm (to skip)
-
-Type /model confirm to add the model without custom URL.`;
-  }
-
-  /**
-   * Handle model add baseUrl step
-   */
-  async handleModelAddBaseUrl(baseUrl: string): Promise<string> {
-    if (!this.modelAddInProgress) {
-      return 'No model addition in progress. Use /model add to start.';
-    }
-
-    if (!this.pendingModelData.apiKey) {
-      return 'Please set API key first: /model key <your-api-key>';
-    }
-
-    if (baseUrl && baseUrl.trim() !== '') {
-      this.pendingModelData.baseUrl = baseUrl.trim();
-    }
-
-    return await this.finalizeModelAdd();
-  }
-
-  /**
-   * Finalize model addition
-   */
-  async finalizeModelAdd(): Promise<string> {
-    // Set default values
-    this.pendingModelData.maxTokens = this.pendingModelData.maxTokens || 4096;
-    this.pendingModelData.temperature = this.pendingModelData.temperature || 0.7;
-
-    // Add the model
-    try {
-      const model = await this.configManager.addModel({
-        provider: this.pendingModelData.provider!,
-        modelName: this.pendingModelData.modelName!,
-        apiKey: this.pendingModelData.apiKey!,
-        maxTokens: this.pendingModelData.maxTokens,
-        temperature: this.pendingModelData.temperature,
-        baseUrl: this.pendingModelData.baseUrl
-      });
-
-      // Reset state
-      this.modelAddInProgress = false;
-      this.pendingModelData = {};
-
-      let output = `✓ Model added successfully!
-
-Model ID: ${model.id}
-Provider: ${model.provider}
-Model: ${model.modelName}`;
-
-      if (model.baseUrl) {
-        output += `\nBase URL: ${model.baseUrl}`;
-      }
-
-      output += `
-
-The model has been saved and is ready to use.
-You can switch to it anytime with: /model switch ${model.id}`;
-
-      return output;
-    } catch (error) {
-      this.modelAddInProgress = false;
-      this.pendingModelData = {};
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      return `✗ Failed to add model: ${errorMessage}`;
-    }
-  }
-
-  /**
-   * Handle model list
-   */
-  async handleModelList(): Promise<string> {
-    const models = await this.configManager.getAllModels();
-    const currentModel = await this.configManager.getCurrentModel();
-
-    if (models.length === 0) {
-      return `No models configured yet.
-
-Add your first model with: /model add`;
-    }
-
-    let output = `Configured Models (${models.length}):
-`;
-
-    for (const model of models) {
-      const isCurrent = currentModel?.id === model.id;
-      const currentMarker = isCurrent ? ' *' : '';
-      const maskedKey = model.apiKey ? `***${model.apiKey.slice(-4)}` : '(no key)';
-
-      output += `
-${currentMarker}[${model.id}]
-  Provider: ${model.provider}
-  Model: ${model.modelName}
-  API Key: ${maskedKey}
-  Max Tokens: ${model.maxTokens}
-  Temperature: ${model.temperature}`;
-
-      if (model.baseUrl) {
-        output += `
-  Base URL: ${model.baseUrl}`;
-      }
-
-      output += `
-`;
-    }
-
-    output += `
-* = Current model
-
-Switch models: /model switch <model-id>
-Remove model: /model remove <model-id>`;
-
-    return output;
-  }
-
-  /**
-   * Handle model switch
-   */
-  async handleModelSwitch(modelId: string): Promise<string> {
-    const success = await this.configManager.switchModel(modelId);
-
-    if (!success) {
-      return `✗ Model not found: ${modelId}
-
-Use /model list to see available models.`;
-    }
-
-    const model = await this.configManager.getModel(modelId);
-
-    return `✓ Switched to model: ${modelId}
-Provider: ${model?.provider}
-Model: ${model?.modelName}`;
-  }
-
-  /**
-   * Handle model remove
-   */
-  async handleModelRemove(modelId: string): Promise<string> {
-    const model = await this.configManager.getModel(modelId);
-
-    if (!model) {
-      return `✗ Model not found: ${modelId}
-
-Use /model list to see available models.`;
-    }
-
-    const success = await this.configManager.removeModel(modelId);
-
-    if (!success) {
-      return `✗ Failed to remove model: ${modelId}`;
-    }
-
-    return `✓ Removed model: ${modelId} (${model.provider}/${model.modelName})`;
-  }
-
-  /**
-   * Check if model addition is in progress
-   */
-  isModelAddInProgress(): boolean {
-    return this.modelAddInProgress;
-  }
-
-  /**
-   * Get pending model data
-   */
-  getPendingModelData(): typeof this.pendingModelData {
-    return { ...this.pendingModelData };
-  }
-
-  /**
-   * Set pending model data field
-   */
-  setPendingModelData(field: string, value: any): void {
-    (this.pendingModelData as any)[field] = value;
   }
 
   isAgentStarted(): boolean {

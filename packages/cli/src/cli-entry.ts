@@ -113,20 +113,15 @@ async function main() {
           try {
             // Check if this is a command
             if (trimmed.startsWith('/')) {
-              // Handle model addition sub-commands
-              if (commandHandler.isModelAddInProgress()) {
-                await handleModelAddStep(trimmed, commandHandler, prompt);
-              } else {
-                const result = await handleCommand(trimmed, cli, commandHandler);
-                console.log(result);
+              const result = await handleCommand(trimmed, cli, commandHandler);
+              console.log(result);
 
-                // Check if this is a quit command
-                if (commandHandler.isQuitCommand(result)) {
-                  console.log('Goodbye!');
-                  rl.close();
-                  process.exit(0);
-                  return;
-                }
+              // Check if this is a quit command
+              if (commandHandler.isQuitCommand(result)) {
+                console.log('Goodbye!');
+                rl.close();
+                process.exit(0);
+                return;
               }
             } else {
               // Regular message - show that agent needs to be started
@@ -159,48 +154,6 @@ async function main() {
       process.exit(1);
     }
   }
-}
-
-/**
- * Handle model addition interactive steps
- */
-async function handleModelAddStep(
-  input: string,
-  commandHandler: any,
-  prompt: () => void
-): Promise<void> {
-  const parts = input.slice(1).split(/\s+/);
-  const command = parts[0];
-  const subCommand = parts[1];
-  const value = parts.slice(2).join(' ');
-
-  if (command === 'model' && subCommand === 'cancel') {
-    const result = await commandHandler.execute({ command: 'model', action: 'cancel', args: [] });
-    console.log(result);
-    return;
-  }
-
-  if (command === 'model' && subCommand === 'provider') {
-    const result = await commandHandler.handleModelAddProvider(value);
-    console.log(result);
-    return;
-  }
-
-  if (command === 'model' && subCommand === 'name') {
-    const result = await commandHandler.handleModelAddName(value);
-    console.log(result);
-    return;
-  }
-
-  if (command === 'model' && subCommand === 'key') {
-    const result = await commandHandler.handleModelAddKey(value);
-    console.log(result);
-    return;
-  }
-
-  // Other commands during model add
-  const result = await commandHandler.execute({ command: 'model', action: 'cancel', args: [] });
-  console.log(result);
 }
 
 /**

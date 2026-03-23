@@ -83,7 +83,7 @@ describe('MainLayout', () => {
     layout = new MainLayout(screenManager.screen, CatppuccinMocha);
     expect(layout.header.options.content).toContain('DevBoost');
     expect(layout.header.options.content).toContain('v0.1.0');
-    expect(layout.header.options.tags).toBe(true);
+    expect(layout.header.options.tags).toBe(false);
   });
 
   it('should position header at top', () => {

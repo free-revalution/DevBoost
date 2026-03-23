@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { TUIManager } from './tui.js';
+import { TUIManager } from '../src/tui.js';
 import { ScreenManager } from '@devboost/tui';
 import { Agent, ProcessResult } from '@devboost/core';
 

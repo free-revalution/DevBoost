@@ -3,10 +3,10 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { DevBoostCLI } from './cli.js';
+import { DevBoostCLI } from '../src/cli.js';
 import { Agent } from '@devboost/core';
-import { ConfigManager } from './config.js';
-import { ProjectManager } from './project.js';
+import { ConfigManager } from '../src/config.js';
+import { ProjectManager } from '../src/project.js';
 
 // Mock the TUI modules
 vi.mock('@devboost/tui', () => ({

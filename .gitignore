@@ -37,7 +37,11 @@ pnpm-debug.log*
 .devboost/models.json
 .devboost/telegram.json
 
-# But keep conversation history and context
+# Ignore .devboost in subdirectories (only keep root .devboost)
+**/.devboost/
+!/.devboost/
+
+# But keep conversation history and context in root .devboost
 !.devboost/context/
 !.devboost/sessions/
 !.devboost/history/

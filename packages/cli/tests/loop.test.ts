@@ -3,11 +3,11 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { MainLoop } from './loop.js';
+import { MainLoop } from '../src/loop.js';
 import { Agent } from '@devboost/core';
-import { TUIManager } from './tui.js';
-import { CommandHandler } from './commands.js';
-import { ConfigManager } from './config.js';
+import { TUIManager } from '../src/tui.js';
+import { CommandHandler } from '../src/commands.js';
+import { ConfigManager } from '../src/config.js';
 
 describe('MainLoop', () => {
   let mainLoop: MainLoop;

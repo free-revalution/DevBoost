@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { CommandHandler, ParsedCommand } from './commands.js';
-import { ConfigManager } from './config.js';
+import { CommandHandler, ParsedCommand } from '../src/commands.js';
+import { ConfigManager } from '../src/config.js';
 import { Agent } from '@devboost/core';
-import { TUIManager } from './tui.js';
+import { TUIManager } from '../src/tui.js';
 
 describe('CommandHandler', () => {
   let handler: CommandHandler;
@@ -56,13 +56,13 @@ describe('CommandHandler', () => {
     });
 
     it('should parse command with action', () => {
-      const result = handler.parse('/provider add');
-      expect(result).toEqual({ command: 'provider', action: 'add', args: [] });
+      const result = handler.parse('/model list');
+      expect(result).toEqual({ command: 'model', action: 'list', args: [] });
     });
 
     it('should parse command with action and args', () => {
-      const result = handler.parse('/provider add anthropic');
-      expect(result).toEqual({ command: 'provider', action: 'add', args: ['anthropic'] });
+      const result = handler.parse('/model switch deepseek');
+      expect(result).toEqual({ command: 'model', action: 'switch', args: ['deepseek'] });
     });
 
     it('should parse command with multiple args', () => {
