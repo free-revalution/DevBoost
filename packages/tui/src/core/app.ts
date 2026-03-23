@@ -96,7 +96,7 @@ export class App {
       left: 0,
       top: 0,
       width: 20,
-      height: '100%-3',
+      bottom: 3,
       style: {
         bg: this.theme.bgDark,
         fg: this.theme.fg
@@ -112,8 +112,8 @@ export class App {
       parent: this.screen,
       left: 20,
       top: 0,
-      width: '100%-20',
-      height: '100%-3',
+      right: 0,
+      bottom: 3,
       style: {
         bg: this.theme.bg,
         fg: this.theme.fg
@@ -137,11 +137,12 @@ export class App {
     this.inputBox = blessed.textbox({
       parent: this.screen,
       left: 0,
+      right: 0,
       bottom: 0,
-      width: '100%',
       height: 3,
       inputOnFocus: true,
       keys: true,
+      mouse: true,
       prompt: '> ',
       style: {
         fg: this.theme.fg,
