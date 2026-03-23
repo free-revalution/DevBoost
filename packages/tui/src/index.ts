@@ -1,7 +1,26 @@
 // Core Framework
 export { App } from './core/app.js';
 export { EventManager, type KeyBinding, type EventType, type EventData, type EventHandler } from './core/event-manager.js';
-export { BasePanel, type PanelState, type PanelConfig } from './panels/base-panel.js';
+
+// Panels
+export {
+  BasePanel,
+  AgentPanel,
+  ChatPanel,
+  ModelPanel,
+  ToolsPanel,
+  SettingsPanel,
+  type PanelState,
+  type PanelConfig,
+  type AgentPanelConfig,
+  type ChatPanelConfig,
+  type ModelPanelConfig,
+  type ToolsPanelConfig,
+  type SettingsPanelConfig,
+  type AgentStatus,
+  type ToolInfo,
+  type SettingItem
+} from './panels/index.js';
 
 // Legacy exports (for backward compatibility)
 export { CatppuccinMocha, type Theme } from './theme.js';
