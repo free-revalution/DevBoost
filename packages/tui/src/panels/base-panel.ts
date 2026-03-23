@@ -196,6 +196,26 @@ export abstract class BasePanel {
   }
 
   /**
+   * Update theme for this panel
+   * Called when the global theme changes
+   */
+  updateTheme(theme: Theme): void {
+    this.theme = theme;
+
+    // Update container styles
+    this.container.style.bg = theme.bg;
+    this.container.style.fg = theme.fg;
+
+    // Update border if focused
+    if (this.focused) {
+      this.container.style.border = { fg: theme.mauve };
+    }
+
+    // Re-render content with new theme
+    this.renderContent();
+  }
+
+  /**
    * Cleanup resources
    */
   destroy(): void {

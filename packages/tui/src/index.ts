@@ -1,6 +1,20 @@
 // Core Framework
 export { App } from './core/app.js';
 export { EventManager, type KeyBinding, type EventType, type EventData, type EventHandler } from './core/event-manager.js';
+export { NotificationManager, notify, notifyInfo, notifySuccess, notifyWarning, notifyError, setGlobalNotificationManager, getGlobalNotificationManager, type NotificationConfig, type NotificationType } from './core/notification.js';
+
+// Theme System
+export {
+  CatppuccinMocha,
+  TokyoNight,
+  Dracula,
+  Nord,
+  Monokai,
+  GruvboxDark,
+  AllThemes,
+  ThemeManager,
+  type Theme
+} from './theme.js';
 
 // Panels
 export {
@@ -24,7 +38,6 @@ export {
 } from './panels/index.js';
 
 // Legacy exports (for backward compatibility)
-export { CatppuccinMocha, type Theme } from './theme.js';
 export { ScreenManager } from './screen.js';
 export { MainLayout } from './layout.js';
 

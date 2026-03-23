@@ -7,8 +7,9 @@
 
 import blessed from 'blessed';
 import { EventManager, KeyBinding } from './event-manager.js';
+import { NotificationManager } from './notification.js';
 import { BasePanel, PanelConfig } from '../panels/base-panel.js';
-import { Theme, CatppuccinMocha } from '../theme.js';
+import { ThemeManager, type Theme } from '../theme.js';
 
 /**
  * Panel configuration for registration
@@ -24,7 +25,7 @@ export interface PanelRegistration {
  * App configuration
  */
 export interface AppConfig {
-  theme?: Theme;
+  themeManager?: ThemeManager;
   panels?: PanelRegistration[];
   onQuit?: () => void | Promise<void>;
 }
@@ -35,7 +36,9 @@ export interface AppConfig {
 export class App {
   readonly screen: ReturnType<typeof blessed.screen>;
   readonly eventManager: EventManager;
-  readonly theme: Theme;
+  readonly themeManager: ThemeManager;
+  readonly notificationManager: NotificationManager;
+  get theme(): Theme { return this.themeManager.getCurrentTheme(); }
   private panels: Map<number, BasePanel>;
   private currentPanel: number | null;
   private sidebar!: ReturnType<typeof blessed.box>;
@@ -45,7 +48,7 @@ export class App {
   private onQuitCallback?: () => void | Promise<void>;
 
   constructor(config: AppConfig = {}) {
-    this.theme = config.theme || CatppuccinMocha;
+    this.themeManager = config.themeManager || new ThemeManager();
     this.panels = new Map();
     this.currentPanel = null;
     this.onQuitCallback = config.onQuit;
@@ -58,6 +61,9 @@ export class App {
 
     // Create event manager
     this.eventManager = new EventManager(this.screen);
+
+    // Create notification manager
+    this.notificationManager = new NotificationManager(this.screen, this.theme);
 
     // Setup UI
     this.setupUI();
@@ -179,7 +185,8 @@ export class App {
     this.eventManager.registerKey(
       ['h'],
       async () => {
-        // Left navigation - could be used for sub-panels
+        // Left navigation - switch to previous panel
+        this.navigateToPreviousPanel();
       },
       'Navigate left'
     );
@@ -187,9 +194,28 @@ export class App {
     this.eventManager.registerKey(
       ['l'],
       async () => {
-        // Right navigation - could be used for sub-panels
+        // Right navigation - switch to next panel
+        this.navigateToNextPanel();
       },
       'Navigate right'
+    );
+
+    // Also support k for up (previous panel)
+    this.eventManager.registerKey(
+      ['k'],
+      async () => {
+        this.navigateToPreviousPanel();
+      },
+      'Navigate up (previous panel)'
+    );
+
+    // Also support j for down (next panel)
+    this.eventManager.registerKey(
+      ['j'],
+      async () => {
+        this.navigateToNextPanel();
+      },
+      'Navigate down (next panel)'
     );
 
     // Enter key for confirm
@@ -214,6 +240,24 @@ export class App {
         }
       },
       'Go back'
+    );
+
+    // Theme switching - T for next theme
+    this.eventManager.registerKey(
+      ['t'],
+      async () => {
+        this.nextTheme();
+      },
+      'Switch theme'
+    );
+
+    // Theme switching - Shift+T for previous theme
+    this.eventManager.registerKey(
+      ['T'],
+      async () => {
+        this.previousTheme();
+      },
+      'Switch theme (previous)'
     );
   }
 
@@ -392,6 +436,146 @@ export class App {
   }
 
   /**
+   * Navigate to previous panel (vim-style: h or k)
+   */
+  navigateToPreviousPanel(): void {
+    if (!this.currentPanel) {
+      if (this.panels.has(1)) {
+        this.switchPanel(1);
+      }
+      return;
+    }
+
+    // Find the previous panel
+    const panelKeys = Array.from(this.panels.keys()).sort((a, b) => a - b);
+    const currentIndex = panelKeys.indexOf(this.currentPanel);
+
+    if (currentIndex > 0) {
+      const prevPanel = panelKeys[currentIndex - 1];
+      this.switchPanel(prevPanel);
+    } else {
+      // Wrap around to last panel
+      const lastPanel = panelKeys[panelKeys.length - 1];
+      this.switchPanel(lastPanel);
+    }
+  }
+
+  /**
+   * Navigate to next panel (vim-style: l or j)
+   */
+  navigateToNextPanel(): void {
+    if (!this.currentPanel) {
+      if (this.panels.has(1)) {
+        this.switchPanel(1);
+      }
+      return;
+    }
+
+    // Find the next panel
+    const panelKeys = Array.from(this.panels.keys()).sort((a, b) => a - b);
+    const currentIndex = panelKeys.indexOf(this.currentPanel);
+
+    if (currentIndex >= 0 && currentIndex < panelKeys.length - 1) {
+      const nextPanel = panelKeys[currentIndex + 1];
+      this.switchPanel(nextPanel);
+    } else {
+      // Wrap around to first panel
+      if (panelKeys.length > 0) {
+        this.switchPanel(panelKeys[0]);
+      }
+    }
+  }
+
+  /**
+   * Switch to next theme
+   */
+  nextTheme(): void {
+    this.themeManager.nextTheme();
+    this.applyTheme();
+  }
+
+  /**
+   * Switch to previous theme
+   */
+  previousTheme(): void {
+    this.themeManager.previousTheme();
+    this.applyTheme();
+  }
+
+  /**
+   * Set theme by name
+   */
+  setThemeByName(name: string): boolean {
+    if (this.themeManager.setThemeByName(name)) {
+      this.applyTheme();
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Get all available themes
+   */
+  getAllThemes(): Theme[] {
+    return this.themeManager.getAllThemes();
+  }
+
+  /**
+   * Get current theme index
+   */
+  getCurrentThemeIndex(): number {
+    return this.themeManager.getCurrentThemeIndex();
+  }
+
+  /**
+   * Apply current theme to all UI elements
+   */
+  private applyTheme(): void {
+    const theme = this.theme;
+
+    // Update sidebar
+    if (this.sidebar) {
+      this.sidebar.style.bg = theme.bgDark;
+      this.sidebar.style.fg = theme.fg;
+      (this.sidebar as any).border.fg = theme.border;
+    }
+
+    // Update main area
+    if (this.mainArea) {
+      this.mainArea.style.bg = theme.bg;
+      this.mainArea.style.fg = theme.fg;
+    }
+
+    // Update status bar
+    if (this.statusBar) {
+      this.statusBar.style.bg = theme.bgLight;
+      this.statusBar.style.fg = theme.fg;
+    }
+
+    // Update input box
+    if (this.inputBox) {
+      (this.inputBox as any).style.fg = theme.fg;
+      (this.inputBox as any).style.bg = theme.bg;
+      (this.inputBox as any).style.focus.bg = theme.bgLight;
+    }
+
+    // Update all panels
+    for (const panel of this.panels.values()) {
+      panel.updateTheme(theme);
+    }
+
+    // Update notification manager theme
+    this.notificationManager.updateTheme(theme);
+
+    // Update sidebar highlight
+    this.updateSidebar();
+    this.updateStatusBar();
+
+    // Re-render
+    this.screen.render();
+  }
+
+  /**
    * Quit the application
    */
   async quit(): Promise<void> {
@@ -421,5 +605,12 @@ export class App {
    */
   getEventManager(): EventManager {
     return this.eventManager;
+  }
+
+  /**
+   * Get the notification manager
+   */
+  getNotificationManager(): NotificationManager {
+    return this.notificationManager;
   }
 }

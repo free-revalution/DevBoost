@@ -5,7 +5,7 @@
  * This replaces the old MainLayout-based system.
  */
 
-import { App, AgentPanel, ChatPanel, ModelPanel, ToolsPanel, SettingsPanel, type ModelConfig } from '@devboost/tui';
+import { App, AgentPanel, ChatPanel, ModelPanel, ToolsPanel, SettingsPanel, ThemeManager, type ModelConfig, type Theme } from '@devboost/tui';
 import { Agent, Role } from '@devboost/core';
 import { ConfigManager } from './config.js';
 
@@ -17,15 +17,19 @@ export class NewTUIManager {
   private agent: Agent;
   private configManager: ConfigManager;
   private agentPanel: AgentPanel | null = null;
+  private themeManager: ThemeManager;
   private initialized: boolean = false;
 
   constructor(agent: Agent, configManager: ConfigManager) {
     this.agent = agent;
     this.configManager = configManager;
 
+    // Create theme manager
+    this.themeManager = new ThemeManager();
+
     // Create the App with all panels
     this.app = new App({
-      theme: undefined, // Use default theme
+      themeManager: this.themeManager,
       panels: this.createPanels(),
       onQuit: async () => {
         await this.cleanup();
@@ -52,7 +56,7 @@ export class NewTUIManager {
           id: 'chat',
           title: '对话',
           position: { top: 0, left: 0, width: '100%', height: '100%' },
-          theme: this.app['theme'], // Access private property
+          theme: this.app.theme,
           getMessages: () => {
             const context = this.agent.getContext();
             return context.getMessages().map(m => ({
@@ -75,7 +79,7 @@ export class NewTUIManager {
           id: 'agent',
           title: 'Agent',
           position: { top: 0, left: 0, width: '100%', height: '100%' },
-          theme: this.app['theme'],
+          theme: this.app.theme,
           agent: this.agent
         })
       },
@@ -87,7 +91,7 @@ export class NewTUIManager {
           id: 'model',
           title: '模型',
           position: { top: 0, left: 0, width: '100%', height: '100%' },
-          theme: this.app['theme'],
+          theme: this.app.theme,
           getModels: async () => await this.configManager.getAllModels(),
           getCurrentModelId: async () => {
             const config = await this.configManager.load();
@@ -113,7 +117,7 @@ export class NewTUIManager {
           id: 'tools',
           title: '工具',
           position: { top: 0, left: 0, width: '100%', height: '100%' },
-          theme: this.app['theme'],
+          theme: this.app.theme,
           getTools: () => {
             const registry = this.agent.getToolRegistry();
             const tools = registry.list();
@@ -134,14 +138,14 @@ export class NewTUIManager {
           id: 'settings',
           title: '设置',
           position: { top: 0, left: 0, width: '100%', height: '100%' },
-          theme: this.app['theme'],
+          theme: this.app.theme,
           getSettings: () => {
             const config = this.configManager as any;
             return [
               {
                 key: 'version',
                 label: '版本',
-                value: config.version || '0.1.0',
+                value: config.version || '0.2.0',
                 type: 'string' as const,
                 editable: false
               },
@@ -151,11 +155,39 @@ export class NewTUIManager {
                 value: config.projectPath || '',
                 type: 'string' as const,
                 editable: false
+              },
+              {
+                key: 'theme',
+                label: '当前主题',
+                value: this.themeManager.getCurrentTheme().name,
+                type: 'string' as const,
+                editable: false
               }
             ];
           },
           onResetConfig: async () => {
             await this.configManager.reset();
+          },
+          onSwitchTheme: async (direction: 'next' | 'previous' | 'select') => {
+            if (direction === 'next') {
+              this.app.nextTheme();
+            } else if (direction === 'previous') {
+              this.app.previousTheme();
+            }
+            // For 'select', we need to show the theme menu (handled by panel)
+          },
+          getCurrentTheme: () => {
+            const theme = this.themeManager.getCurrentTheme();
+            return {
+              name: theme.name,
+              index: this.themeManager.getCurrentThemeIndex()
+            };
+          },
+          getAllThemes: () => {
+            return this.themeManager.getAllThemes().map((t, i) => ({
+              name: t.name,
+              index: i
+            }));
           }
         })
       }

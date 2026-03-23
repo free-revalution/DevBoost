@@ -29,6 +29,9 @@ export interface SettingsPanelConfig extends PanelConfig {
   onEditConfig?: () => void | Promise<void>;
   onResetConfig?: () => void | Promise<void>;
   onTelegramSettings?: () => void | Promise<void>;
+  onSwitchTheme?: (direction: 'next' | 'previous' | 'select') => void | Promise<void>;
+  getCurrentTheme?: () => { name: string; index: number };
+  getAllThemes?: () => Array<{ name: string; index: number }>;
 }
 
 /**
@@ -40,6 +43,9 @@ export class SettingsPanel extends BasePanel {
   private onEditConfig?: () => void | Promise<void>;
   private onResetConfig?: () => void | Promise<void>;
   private onTelegramSettings?: () => void | Promise<void>;
+  private onSwitchTheme?: (direction: 'next' | 'previous' | 'select') => void | Promise<void>;
+  private getCurrentTheme?: () => { name: string; index: number };
+  private getAllThemes?: () => Array<{ name: string; index: number }>;
   private settingsList: ReturnType<typeof blessed.list>;
 
   constructor(
@@ -53,6 +59,9 @@ export class SettingsPanel extends BasePanel {
     this.onEditConfig = config.onEditConfig;
     this.onResetConfig = config.onResetConfig;
     this.onTelegramSettings = config.onTelegramSettings;
+    this.onSwitchTheme = config.onSwitchTheme;
+    this.getCurrentTheme = config.getCurrentTheme;
+    this.getAllThemes = config.getAllThemes;
 
     // Create settings list
     this.settingsList = blessed.list({
@@ -121,9 +130,28 @@ export class SettingsPanel extends BasePanel {
     this.eventManager.registerKey(
       ['T'],
       async () => {
-        await this.toggleTheme();
+        await this.showThemeMenu();
       },
-      'Toggle theme',
+      'Theme menu',
+      this.id
+    );
+
+    // Bracket keys for quick theme switching
+    this.eventManager.registerKey(
+      ['['],
+      async () => {
+        await this.switchTheme('previous');
+      },
+      'Previous theme',
+      this.id
+    );
+
+    this.eventManager.registerKey(
+      [']'],
+      async () => {
+        await this.switchTheme('next');
+      },
+      'Next theme',
       this.id
     );
   }
@@ -163,7 +191,7 @@ export class SettingsPanel extends BasePanel {
       parent: this.container,
       bottom: 1,
       left: 2,
-      content: 'e:编辑 | r:重置 | t:Telegram | T:主题'
+      content: 'e:编辑 | r:重置 | t:Telegram | T:主题 | [/:上一个主题 | ]/:下一个主题'
     });
 
     this.screen.render();
@@ -229,15 +257,104 @@ export class SettingsPanel extends BasePanel {
   }
 
   /**
-   * Toggle theme
+   * Show theme selection menu
+   */
+  private async showThemeMenu(): Promise<void> {
+    const allThemes = this.getAllThemes ? this.getAllThemes() : [];
+    const currentTheme = this.getCurrentTheme ? this.getCurrentTheme() : { name: 'Unknown', index: 0 };
+
+    const menuItems = allThemes.map((t, i) => {
+      const isCurrent = t.index === currentTheme.index;
+      const prefix = isCurrent ? '→ ' : '  ';
+      const highlight = isCurrent ? '{mauve-fg}{bold}' : '';
+      const reset = isCurrent ? '{/mauve-fg}{/bold}' : '';
+      return `${prefix}${highlight}${t.name}${reset}`;
+    });
+
+    const themeMenu = blessed.list({
+      parent: this.screen,
+      top: 'center',
+      left: 'center',
+      width: 35,
+      height: allThemes.length + 4,
+      label: '选择主题',
+      tags: true,
+      style: {
+        bg: this.theme.bgDark,
+        fg: this.theme.fg,
+        border: { fg: this.theme.mauve },
+        selected: {
+          bg: this.theme.bgLight,
+          fg: this.theme.mauve
+        }
+      },
+      border: {
+        type: 'line',
+        fg: this.theme.mauve
+      },
+      items: menuItems,
+      keys: true,
+      vi: true,
+      mouse: true
+    } as any);
+
+    // Select current theme
+    themeMenu.select(currentTheme.index);
+    themeMenu.focus();
+
+    const closeMenu = async () => {
+      themeMenu.destroy();
+      this.screen.render();
+    };
+
+    const selectTheme = async () => {
+      const selected = (themeMenu as any).selected;
+      if (selected !== undefined && this.onSwitchTheme) {
+        // Switch to selected theme
+        for (let i = 0; i <= selected; i++) {
+          await this.onSwitchTheme('next');
+        }
+      }
+      await closeMenu();
+    };
+
+    this.screen.key(['escape', 'q'], async () => await closeMenu());
+    this.screen.key(['enter'], selectTheme);
+
+    themeMenu.key(['escape'], async () => await closeMenu());
+    themeMenu.key(['enter'], selectTheme);
+
+    this.screen.render();
+  }
+
+  /**
+   * Switch theme
+   */
+  private async switchTheme(direction: 'next' | 'previous'): Promise<void> {
+    if (this.onSwitchTheme) {
+      await this.onSwitchTheme(direction);
+      // Show notification
+      const currentTheme = this.getCurrentTheme ? this.getCurrentTheme() : { name: 'Unknown', index: 0 };
+      this.showNotification(`主题: ${currentTheme.name}`);
+    }
+  }
+
+  /**
+   * Toggle theme (legacy method - redirects to next theme)
    */
   private async toggleTheme(): Promise<void> {
-    // Theme toggle would be implemented here
+    await this.switchTheme('next');
+  }
+
+  /**
+   * Show a temporary notification
+   */
+  private showNotification(message: string, duration: number = 2000): void {
     const notification = blessed.box({
       parent: this.screen,
       top: 1,
       left: 'center',
-      width: 30,
+      width: message.length + 4,
       height: 3,
       border: {
         type: 'line',
@@ -247,13 +364,14 @@ export class SettingsPanel extends BasePanel {
         bg: this.theme.bgDark,
         fg: this.theme.fg
       },
-      content: '主题切换功能即将推出'
+      content: ` ${message} `,
+      tags: true
     } as any);
 
     setTimeout(() => {
       notification.destroy();
       this.screen.render();
-    }, 2000);
+    }, duration);
 
     this.screen.render();
   }
@@ -273,7 +391,13 @@ export class SettingsPanel extends BasePanel {
         await this.openTelegramSettings();
         break;
       case 'T':
-        await this.toggleTheme();
+        await this.showThemeMenu();
+        break;
+      case '[':
+        await this.switchTheme('previous');
+        break;
+      case ']':
+        await this.switchTheme('next');
         break;
     }
   }
@@ -286,7 +410,9 @@ export class SettingsPanel extends BasePanel {
       { key: 'e', description: '编辑配置' },
       { key: 'r', description: '重置为默认' },
       { key: 't', description: 'Telegram 设置' },
-      { key: 'T', description: '切换主题' }
+      { key: 'T', description: '主题菜单' },
+      { key: '[', description: '上一个主题' },
+      { key: ']', description: '下一个主题' }
     ];
   }
 
