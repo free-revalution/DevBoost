@@ -48,10 +48,10 @@ export class ChatPanel extends BasePanel {
     // Create message list
     this.messageList = blessed.list({
       parent: this.container,
-      top: 2,
-      left: 2,
-      width: '100%-4',
-      height: '100%-8',
+      top: 1,
+      left: 1,
+      width: '100%-2',
+      height: '100%-2',
       tags: true,
       style: {
         bg: this.theme.bg,
@@ -69,8 +69,10 @@ export class ChatPanel extends BasePanel {
       alwaysScroll: true,
       keys: true,
       vi: true,
-      mouse: true
-    });
+      mouse: true,
+      align: 'left',
+      valign: 'top'
+    } as any);
 
     // Setup key bindings
     this.setupKeyBindings();
@@ -123,10 +125,14 @@ export class ChatPanel extends BasePanel {
     this.container.setLabel(header);
 
     // Update message list
-    this.messageList.setItems(displayMessages);
+    if (displayMessages.length === 0) {
+      this.messageList.setItems(['暂无消息', '在下方输入框输入内容开始对话']);
+    } else {
+      this.messageList.setItems(displayMessages);
+    }
 
     // Scroll to bottom
-    this.messageList.select(displayMessages.length - 1);
+    this.messageList.select(Math.max(0, displayMessages.length - 1));
     this.screen.render();
   }
 

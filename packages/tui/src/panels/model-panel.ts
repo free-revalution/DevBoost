@@ -146,15 +146,22 @@ export class ModelPanel extends BasePanel {
     this.container.setLabel(header);
 
     // Update model list
-    const modelItems = models.map((model, index) => {
-      const isCurrent = model.id === currentModelId;
-      const prefix = isCurrent ? '→ ' : '  ';
-      const highlight = isCurrent ? `{${this.theme.mauve}-fg}{bold}` : '';
-      const reset = isCurrent ? '{' + '/}' : '';
-      return `${highlight}${prefix}${model.provider}/${model.modelName}${reset}`;
-    });
-
-    this.modelList.setItems(modelItems);
+    if (models.length === 0) {
+      this.modelList.setItems([
+        '暂无模型配置',
+        '使用 /model add 添加模型',
+        '或使用命令行工具配置'
+      ]);
+    } else {
+      const modelItems = models.map((model, index) => {
+        const isCurrent = model.id === currentModelId;
+        const prefix = isCurrent ? '→ ' : '  ';
+        const highlight = isCurrent ? `{${this.theme.mauve}-fg}{bold}` : '';
+        const reset = isCurrent ? '{' + '/}' : '';
+        return `${highlight}${prefix}${model.provider}/${model.modelName}${reset}`;
+      });
+      this.modelList.setItems(modelItems);
+    }
     this.screen.render();
   }
 

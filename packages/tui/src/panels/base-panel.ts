@@ -66,7 +66,8 @@ export abstract class BasePanel {
       style: {
         bg: this.theme.bg,
         fg: this.theme.fg
-      }
+      },
+      tags: true
     });
 
     this.setupEventHandlers();
@@ -114,7 +115,16 @@ export abstract class BasePanel {
    */
   show(): void {
     this.container.show();
+    // Re-render content to ensure it's displayed correctly
     this.renderContent();
+    // Ensure all child elements are visible
+    if ((this.container as any).children) {
+      for (const child of (this.container as any).children) {
+        if (child.hide) {
+          child.show();
+        }
+      }
+    }
     this.screen.render();
   }
 
