@@ -1,18 +1,6 @@
 {
   "version": "0.1.0",
   "currentModelId": "anthropic-default",
-  "models": [
-    {
-      "id": "anthropic-default",
-      "provider": "anthropic",
-      "modelName": "claude-3-5-sonnet-20241022",
-      "apiKey": "",
-      "maxTokens": 4096,
-      "temperature": 0.7,
-      "createdAt": "2026-03-21T07:26:03.018Z",
-      "isDefault": true
-    }
-  ],
   "projectPath": "/Users/jiang/development/DevBoost",
   "createdAt": "2026-03-21T07:26:03.018Z",
   "updatedAt": "2026-03-21T07:43:43.108Z"
