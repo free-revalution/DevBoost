@@ -18,7 +18,7 @@ export interface PanelRegistration {
   id: string;
   title: string;
   index: number; // 1-5 for keyboard shortcuts
-  factory: () => BasePanel;
+  factory: (parent: ReturnType<typeof blessed.box>) => BasePanel;
 }
 
 /**
@@ -265,7 +265,8 @@ export class App {
    * Register a panel
    */
   registerPanel(registration: PanelRegistration): void {
-    const panel = registration.factory();
+    // Pass mainArea as parent to panel factory
+    const panel = registration.factory(this.mainArea);
     this.panels.set(registration.index, panel);
 
     // Add to sidebar

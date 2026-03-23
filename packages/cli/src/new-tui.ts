@@ -51,10 +51,10 @@ export class NewTUIManager {
       id: 'chat',
       title: '对话',
       index: 1,
-      factory: () => new ChatPanel(screen, eventManager, {
+      factory: (parent) => new ChatPanel(screen, eventManager, {
         id: 'chat',
         title: '对话',
-        position: { top: 0, left: 0, width: '100%', height: '100%' },
+        parent: parent,
         theme: theme,
         getMessages: () => {
           const context = this.agent.getContext();
@@ -76,10 +76,10 @@ export class NewTUIManager {
       id: 'agent',
       title: 'Agent',
       index: 2,
-      factory: () => new AgentPanel(screen, eventManager, {
+      factory: (parent) => new AgentPanel(screen, eventManager, {
         id: 'agent',
         title: 'Agent',
-        position: { top: 0, left: 0, width: '100%', height: '100%' },
+        parent: parent,
         theme: theme,
         agent: this.agent
       })
@@ -90,10 +90,10 @@ export class NewTUIManager {
       id: 'model',
       title: '模型',
       index: 3,
-      factory: () => new ModelPanel(screen, eventManager, {
+      factory: (parent) => new ModelPanel(screen, eventManager, {
         id: 'model',
         title: '模型',
-        position: { top: 0, left: 0, width: '100%', height: '100%' },
+        parent: parent,
         theme: theme,
         getModels: async () => await this.configManager.getAllModels(),
         getCurrentModelId: async () => {
@@ -117,10 +117,10 @@ export class NewTUIManager {
       id: 'tools',
       title: '工具',
       index: 4,
-      factory: () => new ToolsPanel(screen, eventManager, {
+      factory: (parent) => new ToolsPanel(screen, eventManager, {
         id: 'tools',
         title: '工具',
-        position: { top: 0, left: 0, width: '100%', height: '100%' },
+        parent: parent,
         theme: theme,
         getTools: () => {
           const registry = this.agent.getToolRegistry();
@@ -140,10 +140,10 @@ export class NewTUIManager {
       id: 'settings',
       title: '设置',
       index: 5,
-      factory: () => new SettingsPanel(screen, eventManager, {
+      factory: (parent) => new SettingsPanel(screen, eventManager, {
         id: 'settings',
         title: '设置',
-        position: { top: 0, left: 0, width: '100%', height: '100%' },
+        parent: parent,
         theme: theme,
         getSettings: () => {
           const config = this.configManager as any;

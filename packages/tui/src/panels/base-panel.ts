@@ -20,8 +20,9 @@ export type PanelState = 'idle' | 'active' | 'loading' | 'error';
 export interface PanelConfig {
   id: string;
   title: string;
-  position: { top: number; left: number; width: number | string; height: number | string };
+  position?: { top: number; left: number; width: number | string; height: number | string };
   theme: Theme;
+  parent?: ReturnType<typeof blessed.box>; // Optional parent element
 }
 
 /**
@@ -51,12 +52,16 @@ export abstract class BasePanel {
     this.focused = false;
 
     // Create container for this panel
+    // Use parent if provided, otherwise use screen with position
+    const parent = config.parent || screen;
+    const position = config.position || { top: 0, left: 0, width: '100%', height: '100%' };
+
     this.container = blessed.box({
-      parent: screen,
-      top: config.position.top,
-      left: config.position.left,
-      width: config.position.width,
-      height: config.position.height,
+      parent: parent,
+      top: position.top,
+      left: position.left,
+      width: position.width,
+      height: position.height,
       hidden: true, // Hidden by default
       style: {
         bg: this.theme.bg,
