@@ -24,7 +24,7 @@ export interface SettingItem {
  * Settings panel configuration
  */
 export interface SettingsPanelConfig extends PanelConfig {
-  getSettings: () => SettingItem[];
+  getSettings: () => SettingItem[] | Promise<SettingItem[]>;
   updateSetting?: (key: string, value: string) => void | Promise<void>;
   onEditConfig?: () => void | Promise<void>;
   onResetConfig?: () => void | Promise<void>;
@@ -35,7 +35,7 @@ export interface SettingsPanelConfig extends PanelConfig {
  * Settings Panel class
  */
 export class SettingsPanel extends BasePanel {
-  private getSettings: () => SettingItem[];
+  private getSettings: () => SettingItem[] | Promise<SettingItem[]>;
   private updateSetting?: (key: string, value: string) => void | Promise<void>;
   private onEditConfig?: () => void | Promise<void>;
   private onResetConfig?: () => void | Promise<void>;
@@ -132,7 +132,16 @@ export class SettingsPanel extends BasePanel {
    * Render the panel content
    */
   protected renderContent(): void {
-    const settings = this.getSettings();
+    this.renderContentAsync().catch(error => {
+      console.error('Error rendering settings panel:', error);
+    });
+  }
+
+  /**
+   * Async render implementation
+   */
+  private async renderContentAsync(): Promise<void> {
+    const settings = await Promise.resolve(this.getSettings());
 
     // Update header
     const header = `设置 (${settings.length} 项)`;
@@ -156,6 +165,8 @@ export class SettingsPanel extends BasePanel {
       left: 2,
       content: 'e:编辑 | r:重置 | t:Telegram | T:主题'
     });
+
+    this.screen.render();
   }
 
   /**

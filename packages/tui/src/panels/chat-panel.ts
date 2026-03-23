@@ -23,7 +23,7 @@ interface DisplayMessage {
  * Chat panel configuration
  */
 export interface ChatPanelConfig extends PanelConfig {
-  getMessages: () => Array<{ role: Role; content: string; timestamp?: string }>;
+  getMessages: () => Array<{ role: Role; content: string; timestamp?: string }> | Promise<Array<{ role: Role; content: string; timestamp?: string }>>;
   onClear?: () => void | Promise<void>;
 }
 
@@ -31,7 +31,7 @@ export interface ChatPanelConfig extends PanelConfig {
  * Chat Panel class
  */
 export class ChatPanel extends BasePanel {
-  private getMessages: () => Array<{ role: Role; content: string; timestamp?: string }>;
+  private getMessages: () => Array<{ role: Role; content: string; timestamp?: string }> | Promise<Array<{ role: Role; content: string; timestamp?: string }>>;
   private onClear?: () => void | Promise<void>;
   private messageList: ReturnType<typeof blessed.list>;
   private searchQuery: string = '';
@@ -106,7 +106,16 @@ export class ChatPanel extends BasePanel {
    * Render the panel content
    */
   protected renderContent(): void {
-    const messages = this.getMessages();
+    this.renderContentAsync().catch(error => {
+      console.error('Error rendering chat panel:', error);
+    });
+  }
+
+  /**
+   * Async render implementation
+   */
+  private async renderContentAsync(): Promise<void> {
+    const messages = await Promise.resolve(this.getMessages());
     const displayMessages = this.formatMessages(messages);
 
     // Update header
@@ -118,6 +127,7 @@ export class ChatPanel extends BasePanel {
 
     // Scroll to bottom
     this.messageList.select(displayMessages.length - 1);
+    this.screen.render();
   }
 
   /**
@@ -205,7 +215,7 @@ export class ChatPanel extends BasePanel {
       const query = input.getValue();
       this.searchQuery = query;
       if (query) {
-        const messages = this.getMessages();
+        const messages = await this.getMessages();
         const filtered = messages.filter(m =>
           m.content.toLowerCase().includes(query.toLowerCase())
         );

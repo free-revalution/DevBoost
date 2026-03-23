@@ -23,7 +23,7 @@ export interface ToolInfo {
  * Tools panel configuration
  */
 export interface ToolsPanelConfig extends PanelConfig {
-  getTools: () => ToolInfo[];
+  getTools: () => ToolInfo[] | Promise<ToolInfo[]>;
   toggleTool?: (toolName: string) => void | Promise<void>;
 }
 
@@ -31,7 +31,7 @@ export interface ToolsPanelConfig extends PanelConfig {
  * Tools Panel class
  */
 export class ToolsPanel extends BasePanel {
-  private getTools: () => ToolInfo[];
+  private getTools: () => ToolInfo[] | Promise<ToolInfo[]>;
   private toggleTool?: (toolName: string) => void | Promise<void>;
   private toolsList: ReturnType<typeof blessed.list>;
 
@@ -104,7 +104,16 @@ export class ToolsPanel extends BasePanel {
    * Render the panel content
    */
   protected renderContent(): void {
-    const tools = this.getTools();
+    this.renderContentAsync().catch(error => {
+      console.error('Error rendering tools panel:', error);
+    });
+  }
+
+  /**
+   * Async render implementation
+   */
+  private async renderContentAsync(): Promise<void> {
+    const tools = await Promise.resolve(this.getTools());
     const builtinTools = tools.filter(t => t.category === 'builtin');
     const customTools = tools.filter(t => t.category === 'custom');
 
@@ -128,6 +137,7 @@ export class ToolsPanel extends BasePanel {
     ];
 
     this.toolsList.setItems(toolItems);
+    this.screen.render();
   }
 
   /**
@@ -135,7 +145,7 @@ export class ToolsPanel extends BasePanel {
    */
   private async toggleSelectedTool(): Promise<void> {
     if (this.toggleTool) {
-      const tools = this.getTools();
+      const tools = await this.getTools();
       const selected = (this.toolsList as any).selected;
 
       // Find the actual tool (skip headers)

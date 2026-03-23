@@ -18,6 +18,7 @@ export {
   type ToolsPanelConfig,
   type SettingsPanelConfig,
   type AgentStatus,
+  type ModelConfig,
   type ToolInfo,
   type SettingItem
 } from './panels/index.js';

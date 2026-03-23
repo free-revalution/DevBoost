@@ -28,8 +28,8 @@ export interface ModelConfig {
  * Model panel configuration
  */
 export interface ModelPanelConfig extends PanelConfig {
-  getModels: () => ModelConfig[];
-  getCurrentModelId: () => string | null;
+  getModels: () => ModelConfig[] | Promise<ModelConfig[]>;
+  getCurrentModelId: () => string | null | Promise<string | null>;
   switchModel: (modelId: string) => void | Promise<void>;
   addModel?: () => void | Promise<void>;
   removeModel?: (modelId: string) => void | Promise<void>;
@@ -39,8 +39,8 @@ export interface ModelPanelConfig extends PanelConfig {
  * Model Panel class
  */
 export class ModelPanel extends BasePanel {
-  private getModels: () => ModelConfig[];
-  private getCurrentModelId: () => string | null;
+  private getModels: () => ModelConfig[] | Promise<ModelConfig[]>;
+  private getCurrentModelId: () => string | null | Promise<string | null>;
   private switchModel: (modelId: string) => void | Promise<void>;
   private addModel?: () => void | Promise<void>;
   private removeModel?: (modelId: string) => void | Promise<void>;
@@ -128,8 +128,18 @@ export class ModelPanel extends BasePanel {
    * Render the panel content
    */
   protected renderContent(): void {
-    const models = this.getModels();
-    const currentModelId = this.getCurrentModelId();
+    // Make render async and handle the promise
+    this.renderContentAsync().catch(error => {
+      console.error('Error rendering model panel:', error);
+    });
+  }
+
+  /**
+   * Async render implementation
+   */
+  private async renderContentAsync(): Promise<void> {
+    const models = await Promise.resolve(this.getModels());
+    const currentModelId = await Promise.resolve(this.getCurrentModelId());
 
     // Update header
     const header = `模型配置 (${models.length} 个模型)`;
@@ -145,13 +155,14 @@ export class ModelPanel extends BasePanel {
     });
 
     this.modelList.setItems(modelItems);
+    this.screen.render();
   }
 
   /**
    * Select and switch to a model
    */
   private async selectModel(): Promise<void> {
-    const models = this.getModels();
+    const models = await this.getModels();
     const selected = (this.modelList as any).selected;
 
     if (selected !== undefined && selected < models.length) {
@@ -177,7 +188,7 @@ export class ModelPanel extends BasePanel {
    * Delete the selected model
    */
   private async deleteModel(): Promise<void> {
-    const models = this.getModels();
+    const models = await this.getModels();
     const selected = (this.modelList as any).selected;
 
     if (selected !== undefined && selected < models.length && this.removeModel) {
